@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>SmartTrip AI Dashboard</h2>
+        <p class="text-muted mb-0">
+            Plan, manage and explore your trips from one place.
+        </p>
+    </div>
+
+    <a class="btn btn-primary" href="{% url 'trip_create' %}">
+        + Create Trip
+    </a>
+</div>
+
+
+{% if memberships %}
+
+{% for m in memberships %}
+
+<div class="card trip-card mb-5">
+
+    <div class="card-body">
+
+        <!-- TRIP HEADER -->
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+
+            <div>
+                <h3 class="mb-1">
+                    {{ m.trip.title }}
+                </h3>
+
+                <p class="text-muted mb-0">
+                    {{ m.trip.destination.name }}
+                    ·
+                    {{ m.trip.start_date }}
+                    to
+                    {{ m.trip.end_date }}
+                </p>
+            </div>
+
+            <a
+                class="btn btn-outline-primary"
+                href="{% url 'trip_detail' m.trip.pk %}">
+                Open Trip
+            </a>
+
+        </div>
+
+
+        <!-- TRIP INFORMATION -->
+
+        <div class="trip-info mb-4">
+
+            <span>
+                Role: {{ m.role }}
+            </span>
+
+            <span>
+                Budget: ₹{{ m.trip.total_budget }}
+            </span>
+
+        </div>
+
+
+        <!-- TRIP PLANNING -->
+
+        <h5 class="section-title">
+            Trip Planning
+        </h5>
+
+        <div class="row g-3 mb-4">
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'itinerary' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📅</div>
+                        <h5>Itinerary</h5>
+                        <p>Plan your trip day by day.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'budget' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">₹</div>
+                        <h5>Budget Planner</h5>
+                        <p>Plan and manage your budget.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'expenses' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">💰</div>
+                        <h5>Expenses</h5>
+                        <p>Track your travel expenses.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'saved_trips' %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔖</div>
+                        <h5>Saved Trips</h5>
+                        <p>View your saved trips.</p>
+                    </div>
+
+                </a>
+            </div>
+
+        </div>
+
+
+        <!-- SMART TRAVEL -->
+
+        <h5 class="section-title">
+            Smart Travel
+        </h5>
+
+        <div class="row g-3 mb-4">
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'recommendations' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">⭐</div>
+                        <h5>Recommendations</h5>
+                        <p>Get personalized place suggestions.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'weather' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">☁️</div>
+                        <h5>Weather</h5>
+                        <p>Check destination weather.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'map' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📍</div>
+                        <h5>Trip Map</h5>
+                        <p>Explore your trip locations.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'assistant' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🤖</div>
+                        <h5>Travel Assistant</h5>
+                        <p>Get help planning your trip.</p>
+                    </div>
+
+                </a>
+            </div>
+
+        </div>
+
+
+        <!-- TRIP MANAGEMENT -->
+
+        <h5 class="section-title">
+            Trip Management
+        </h5>
+
+        <div class="row g-3 mb-4">
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'checklist' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">✓</div>
+                        <h5>Checklist</h5>
+                        <p>Manage your travel checklist.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'journal' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📖</div>
+                        <h5>Travel Journal</h5>
+                        <p>Record your travel memories.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'analytics' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h5>Trip Analytics</h5>
+                        <p>View useful trip insights.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'group' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">👥</div>
+                        <h5>Group Travel</h5>
+                        <p>Manage your travel group.</p>
+                    </div>
+
+                </a>
+            </div>
+
+        </div>
+
+
+        <!-- GROUP FEATURES -->
+
+        <h5 class="section-title">
+            Group Features
+        </h5>
+
+        <div class="row g-3">
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'group' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">👤</div>
+                        <h5>Trip Members</h5>
+                        <p>Manage people in your trip.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'voting' m.trip.pk %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🗳️</div>
+                        <h5>Voting</h5>
+                        <p>Let your group vote on options.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'destinations' %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🌍</div>
+                        <h5>Destinations</h5>
+                        <p>Explore available destinations.</p>
+                    </div>
+
+                </a>
+            </div>
+
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'profile' %}"
+                    class="feature-link">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">👤</div>
+                        <h5>My Profile</h5>
+                        <p>Manage your account.</p>
+                    </div>
+
+                </a>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endfor %}
+
+
+{% else %}
+
+<!-- NO TRIPS -->
+
+<div class="card p-5 text-center">
+
+    <h3>No trips yet</h3>
+
+    <p class="text-muted">
+        Create your first trip to unlock your SmartTrip workspace.
+    </p>
+
+    <div>
+        <a
+            class="btn btn-primary"
+            href="{% url 'trip_create' %}">
+            Create Your First Trip
+        </a>
+    </div>
+
+</div>
+
+{% endif %}
+
+
+<!-- DASHBOARD COUNTS -->
+
+<div class="card p-4 mt-4 mb-4">
+
+    <h5>Trip Overview</h5>
+
+    <p class="mb-0">
+        Owned: {{ owned_count }}
+        ·
+        Shared: {{ shared_count }}
+        ·
+        Saved: {{ saved_count }}
+    </p>
+
+</div>
+
+
+<style>
+
+.trip-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+.trip-info {
+    display: flex;
+    gap: 25px;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.section-title {
+    margin-bottom: 15px;
+    color: #212529;
+}
+
+.feature-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.feature-card {
+    height: 100%;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #ffffff;
+    transition: 0.2s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.10);
+    border-color: #0d6efd;
+}
+
+.feature-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+}
+
+.feature-card h5 {
+    margin-bottom: 6px;
+    color: #212529;
+}
+
+.feature-card p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+</style>
+
+{% endblock %}
