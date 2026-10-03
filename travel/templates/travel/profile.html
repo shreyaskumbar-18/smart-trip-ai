@@ -1,0 +1,1 @@
+{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="planner-card mx-auto"><h2>Your travel profile</h2><p class="text-muted">These preferences feed the recommendation engine.</p><form method="post">{% csrf_token %}{{form.as_p}}<button class="btn btn-primary w-100">Save Preferences</button></form></div></div>{% endblock %}

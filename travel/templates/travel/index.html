@@ -1,0 +1,14 @@
+{% extends "travel/base.html" %}{% block title %}SmartTrip AI{% endblock %}{% block content %}
+<section class="hero"><div class="container py-5"><div class="row align-items-center hero-row"><div class="col-lg-7">
+<span class="badge bg-light text-dark mb-3">Intelligent travel planning</span><h1 class="display-3 fw-bold">Build trips around your preferences.</h1>
+<p class="lead">SmartTrip AI scores attractions, checks feasibility, optimizes your itinerary and adapts your plan.</p>
+<a href="{% url 'trip_planner' %}" class="btn btn-light btn-lg me-2">Plan a Trip</a><a href="{% url 'destinations' %}" class="btn btn-outline-light btn-lg">Explore</a>
+</div><div class="col-lg-5"><div class="hero-card"><div class="small">MULTI-OBJECTIVE PLANNING</div><h3>Interest + Budget + Time + Sustainability + Crowd</h3>
+<div class="mini-grid"><span>Personalized</span><span>Explainable</span><span>Adaptive</span><span>Research-ready</span></div></div></div></div></div></section>
+<section class="container py-5"><div class="row g-4">
+<div class="col-md-4"><div class="feature-card"><h4>Recommendation engine</h4><p>Combines interests, feedback, hidden-gem score, sustainability and crowd pressure.</p></div></div>
+<div class="col-md-4"><div class="feature-card"><h4>Itinerary optimizer</h4><p>Balances trip pace, attraction scores and daily activity capacity.</p></div></div>
+<div class="col-md-4"><div class="feature-card"><h4>Dynamic planning</h4><p>Prepares alternatives for weather or changed trip assumptions.</p></div></div>
+</div></section><section class="container pb-5"><h2>Featured destinations</h2><div class="row g-4 mt-1">
+{% for d in featured %}<div class="col-md-6 col-lg-4"><div class="card destination-card h-100"><img src="{{d.image_url}}" class="card-img-top"><div class="card-body"><span class="badge text-bg-light">{{d.state}}</span><h4 class="mt-2">{{d.name}}</h4><p>{{d.description}}</p><a href="{% url 'destination_detail' d.pk %}" class="btn btn-outline-dark">Explore</a></div></div></div>{% endfor %}
+</div></section>{% endblock %}

@@ -1,0 +1,1 @@
+document.addEventListener("DOMContentLoaded",()=>{document.querySelectorAll("input,select,textarea").forEach(e=>{if(!e.classList.contains("form-control")&&!e.classList.contains("form-select")&&e.type!=="checkbox")e.classList.add("form-control")})});

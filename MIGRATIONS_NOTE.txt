@@ -1,0 +1,10 @@
+The current project includes the initial Django migration.
+
+For a fresh setup:
+1. Activate the virtual environment.
+2. Run: python manage.py migrate
+3. Run: python manage.py seed_data
+
+If you change database models later, run:
+python manage.py makemigrations
+python manage.py migrate

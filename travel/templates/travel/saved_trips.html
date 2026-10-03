@@ -1,0 +1,64 @@
+{% extends "travel/base.html" %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <h1>Saved Trips</h1>
+
+    <div class="row g-3 mt-2">
+
+        {% for s in saved %}
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="feature-card">
+
+                <h4>{{ s.trip.title }}</h4>
+
+                <p>{{ s.trip.destination.name }}</p>
+
+                <div class="d-flex gap-2">
+
+                    <!-- Open Trip -->
+                    <a
+                        href="{% url 'trip_detail' s.trip.pk %}"
+                        class="btn btn-dark"
+                    >
+                        Open
+                    </a>
+
+                    <!-- Delete Saved Trip -->
+                    <form
+                        method="post"
+                        action="{% url 'remove_saved_trip' s.trip.pk %}"
+                        onsubmit="return confirm('Remove this trip from your saved trips?');"
+                    >
+                        {% csrf_token %}
+
+                        <button
+                            type="submit"
+                            class="btn btn-outline-danger"
+                        >
+                            Delete
+                        </button>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        {% empty %}
+
+        <p>No saved trips.</p>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+{% endblock %}
