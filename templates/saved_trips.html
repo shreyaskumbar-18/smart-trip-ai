@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block title %}Saved Trips{% endblock %}{% block content %}<h2>Saved Trips</h2>{% for s in saved %}<div class="card p-3 mb-2"><h5>{{ s.trip.title }}</h5><p>{{ s.trip.destination.name }} · saved {{ s.saved_at }}</p><a href="{% url 'trip_detail' s.trip.pk %}">Open</a></div>{% empty %}<p>No saved trips.</p>{% endfor %}{% endblock %}
