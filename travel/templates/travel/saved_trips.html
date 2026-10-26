@@ -1,64 +1,96 @@
 {% extends "travel/base.html" %}
+{% block title %}Saved Trips | SmartTrip AI{% endblock %}
 
 {% block content %}
-
-<div class="container py-5">
-
-    <h1>Saved Trips</h1>
-
-    <div class="row g-3 mt-2">
-
-        {% for s in saved %}
-
-        <div class="col-md-6 col-lg-4">
-
-            <div class="feature-card">
-
-                <h4>{{ s.trip.title }}</h4>
-
-                <p>{{ s.trip.destination.name }}</p>
-
-                <div class="d-flex gap-2">
-
-                    <!-- Open Trip -->
-                    <a
-                        href="{% url 'trip_detail' s.trip.pk %}"
-                        class="btn btn-dark"
-                    >
-                        Open
-                    </a>
-
-                    <!-- Delete Saved Trip -->
-                    <form
-                        method="post"
-                        action="{% url 'remove_saved_trip' s.trip.pk %}"
-                        onsubmit="return confirm('Remove this trip from your saved trips?');"
-                    >
-                        {% csrf_token %}
-
-                        <button
-                            type="submit"
-                            class="btn btn-outline-danger"
-                        >
-                            Delete
-                        </button>
-
-                    </form>
-
-                </div>
-
+<section class="section pt-5 pb-5">
+    <div class="container-xl">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div>
+                <span class="eyebrow">Bookmarks</span>
+                <h1 class="section-title mb-1">Saved Trips</h1>
+                <p class="muted mb-0">Your bookmarked travel itineraries and upcoming plans.</p>
             </div>
-
+            <div>
+                <a href="{% url 'trip_planner' %}" class="btn btn-primary rounded-pill px-4">
+                    <i class="fa-solid fa-plus me-1"></i>Plan a new trip
+                </a>
+            </div>
         </div>
 
-        {% empty %}
+        <div class="row g-4">
+            {% for s in saved %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <span class="chip chip-teal">
+                                    <i class="fa-solid fa-location-dot me-1"></i>{{ s.trip.destination.name }}
+                                </span>
+                                <small class="text-muted">
+                                    Saved {{ s.saved_at|date:"M d, Y" }}
+                                </small>
+                            </div>
 
-        <p>No saved trips.</p>
+                            <h4 class="h5 fw-bold text-dark mt-2 mb-2">
+                                {{ s.trip.title }}
+                            </h4>
 
-        {% endfor %}
+                            <p class="small text-muted mb-3">
+                                <i class="fa-regular fa-calendar me-1"></i>{{ s.trip.start_date|date:"M d" }} - {{ s.trip.end_date|date:"M d, Y" }}
+                                · <i class="fa-solid fa-users me-1"></i>{{ s.trip.travelers }} traveler{{ s.trip.travelers|pluralize }}
+                            </p>
 
+                            <div class="d-flex gap-2 flex-wrap mb-3">
+                                <span class="badge text-bg-light border text-dark">
+                                    {{ s.trip.pace|title }} pace
+                                </span>
+                                {% if s.trip.interest %}
+                                    <span class="badge text-bg-light border text-dark">
+                                        {{ s.trip.interest|title }}
+                                    </span>
+                                {% endif %}
+                                <span class="badge text-bg-light border text-dark">
+                                    ₹{{ s.trip.budget }} budget
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 pt-3 border-top mt-2">
+                            <a href="{% url 'trip_detail' s.trip.pk %}" class="btn btn-dark rounded-pill px-3 flex-grow-1">
+                                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>View Itinerary
+                            </a>
+
+                            <form method="post" action="{% url 'remove_saved_trip' s.trip.pk %}" onsubmit="return confirm('Remove this trip from your saved trips?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger rounded-pill" title="Remove from saved">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <div class="metric-card text-center py-5">
+                        <div class="display-6 text-muted mb-3">
+                            <i class="fa-regular fa-bookmark"></i>
+                        </div>
+                        <h4 class="fw-bold mb-2">No saved trips yet</h4>
+                        <p class="muted mb-4" style="max-width: 440px; margin: 0 auto;">
+                            Save itineraries while browsing destinations or planning trips to access them quickly from here.
+                        </p>
+                        <div class="d-flex gap-2 justify-content-center">
+                            <a href="{% url 'trip_planner' %}" class="btn btn-primary rounded-pill px-4">
+                                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Plan a trip
+                            </a>
+                            <a href="{% url 'destinations' %}" class="btn btn-outline-dark rounded-pill px-4">
+                                Explore destinations
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
     </div>
-
-</div>
-
+</section>
 {% endblock %}

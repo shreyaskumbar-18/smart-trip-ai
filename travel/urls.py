@@ -1,175 +1,54 @@
 from django.urls import path
 from . import views
 
-
 urlpatterns = [
-
-    # =========================
-    # HOME
-    # =========================
+    path("", views.home, name="home"),
+    path("register/", views.register_view, name="register"),
+    path("verify-otp/", views.verify_otp_view, name="verify_otp"),
+    path("resend-otp/", views.resend_otp_view, name="resend_otp"),
+    path("login/", views.login_view, name="login"),
+    path("otp-login/", views.request_otp_login, name="otp_login"),
+    path("otp-login/verify/", views.otp_login_verify, name="otp_login_verify"),
+    path("forgot-password/", views.forgot_password, name="forgot_password"),
+    path("forgot-password/verify/", views.verify_reset_otp, name="verify_reset_otp"),
+    path("forgot-password/new/", views.set_new_password, name="set_new_password"),
+    path("logout/", views.logout_view, name="logout"),
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("profile/", views.profile, name="profile"),
+    path("destinations/", views.destinations, name="destinations"),
+    path("destinations/compare/", views.compare_destinations, name="compare_destinations"),
+    path("destinations/<int:pk>/", views.destination_detail, name="destination_detail"),
+    path("destinations/<int:pk>/review/", views.review_destination, name="review_destination"),
+    path("destinations/<int:pk>/review/delete/", views.delete_review, name="delete_review"),
+    path("reviews/<int:review_id>/helpful/", views.helpful_review, name="helpful_review"),
+    path("trip-planner/", views.trip_planner, name="trip_planner"),
+    path("copilot/", views.trip_copilot, name="trip_copilot"),
+    path("trips/<int:pk>/copilot/", views.trip_copilot, name="trip_copilot_detail"),
+    path("trips/<int:pk>/", views.trip_detail, name="trip_detail"),
+    path("trips/<int:pk>/save/", views.save_trip, name="save_trip"),
+    path("trips/<int:pk>/delete/", views.delete_trip, name="delete_trip"),
+    path("trips/<int:pk>/feedback/<int:item_id>/<str:action>/", views.feedback, name="feedback"),
+    path("trips/<int:pk>/budget/", views.budget, name="budget"),
     path(
-        "",
-        views.home,
-        name="home",
-    ),
-
-    # =========================
-    # AUTHENTICATION
-    # =========================
-    path(
-        "register/",
-        views.register_view,
-        name="register",
-    ),
-    path(
-        "login/",
-        views.login_view,
-        name="login",
-    ),
-    path(
-        "logout/",
-        views.logout_view,
-        name="logout",
-    ),
-
-    # =========================
-    # DASHBOARD / PROFILE
-    # =========================
-    path(
-        "dashboard/",
-        views.dashboard,
-        name="dashboard",
+        "trips/<int:pk>/budget/expenses/<int:expense_id>/edit/",
+        views.edit_budget_expense,
+        name="budget_expense_edit",
     ),
     path(
-        "profile/",
-        views.profile,
-        name="profile",
+        "trips/<int:pk>/budget/expenses/<int:expense_id>/delete/",
+        views.delete_budget_expense,
+        name="budget_expense_delete",
     ),
-
-    # =========================
-    # DESTINATIONS
-    # =========================
-    path(
-        "destinations/",
-        views.destinations,
-        name="destinations",
-    ),
-    path(
-        "destinations/<int:pk>/",
-        views.destination_detail,
-        name="destination_detail",
-    ),
-
-    # =========================
-    # TRIP PLANNER
-    # =========================
-    path(
-        "trip-planner/",
-        views.trip_planner,
-        name="trip_planner",
-    ),
-
-    # =========================
-    # TRIP DETAILS
-    # =========================
-    path(
-        "trips/<int:pk>/",
-        views.trip_detail,
-        name="trip_detail",
-    ),
-
-    # =========================
-    # SAVE TRIP
-    # =========================
-    path(
-        "trips/<int:pk>/save/",
-        views.save_trip,
-        name="save_trip",
-    ),
-
-    # =========================
-    # DELETE TRIP
-    # =========================
-    path(
-        "trips/<int:pk>/delete/",
-        views.delete_trip,
-        name="delete_trip",
-    ),
-
-    # =========================
-    # FEEDBACK
-    # =========================
-    path(
-        "trips/<int:pk>/feedback/<int:item_id>/<str:action>/",
-        views.feedback,
-        name="feedback",
-    ),
-
-    # =========================
-    # BUDGET
-    # =========================
-    path(
-        "trips/<int:pk>/budget/",
-        views.budget,
-        name="budget",
-    ),
-
-    # =========================
-    # SAVED TRIPS
-    # =========================
-    path(
-        "saved-trips/",
-        views.saved_trips,
-        name="saved_trips",
-    ),
-    path(
-        "saved-trips/<int:pk>/remove/",
-        views.remove_saved_trip,
-        name="remove_saved_trip",
-    ),
-
-    # =========================
-    # RECOMMENDATIONS
-    # =========================
-    path(
-        "recommendations/",
-        views.recommendations,
-        name="recommendations",
-    ),
-
-    # =========================
-    # WHAT-IF PLANNER
-    # =========================
-    path(
-        "trips/<int:pk>/what-if/",
-        views.what_if_view,
-        name="what_if",
-    ),
-
-    # =========================
-    # DYNAMIC REPLANNING
-    # =========================
-    path(
-        "trips/<int:pk>/replan/",
-        views.replan,
-        name="replan",
-    ),
-
-    # =========================
-    # GROUP TRAVEL
-    # =========================
-    path(
-        "trips/<int:pk>/group/",
-        views.group_trip,
-        name="group",
-    ),
-
-    # =========================
-    # AI TRAVEL ASSISTANT
-    # =========================
-    path(
-        "trips/<int:pk>/assistant/",
-        views.assistant,
-        name="assistant",
-    ),
+    path("saved-trips/", views.saved_trips, name="saved_trips"),
+    path("saved-trips/<int:pk>/remove/", views.remove_saved_trip, name="remove_saved_trip"),
+    path("recommendations/", views.recommendations, name="recommendations"),
+    path("trips/<int:pk>/what-if/", views.what_if_view, name="what_if"),
+    path("trips/<int:pk>/decision-lab/", views.decision_lab, name="decision_lab"),
+    path("trips/<int:pk>/replan/", views.replan, name="replan"),
+    path("trips/<int:pk>/group/", views.group_trip, name="group"),
+    path("trips/join/", views.join_group_trip, name="join_group_trip"),
+    path("assistant/", views.assistant, name="assistant"),
+    path("trips/<int:pk>/assistant/", views.assistant, name="assistant_trip"),
+    path("trips/<int:pk>/pdf/", views.export_trip_pdf, name="export_trip_pdf"),
+    path("admin-analytics/", views.admin_analytics, name="admin_analytics"),
 ]

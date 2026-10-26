@@ -1,1 +1,311 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="planner-card mx-auto"><h1>Group Trip Planning</h1><p>Invite registered users to collaborate on the trip.</p><p><b>Invite code:</b> {{group.invite_code}}</p><form method="post">{% csrf_token %}<input class="form-control mb-3" name="username" placeholder="Registered username"><button class="btn btn-primary">Add member</button></form><hr><h5>Members</h5>{% for m in group.members.all %}<div>{{m.username}}</div>{% empty %}<p>No members yet.</p>{% endfor %}</div></div>{% endblock %}
+{% extends "travel/base.html" %}
+{% block title %}Group Collaboration | {{ trip.title }} | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section pt-5 pb-5">
+  <div class="container-xl">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+      <div>
+        <span class="badge text-bg-primary rounded-pill px-3 py-2 mb-2">
+          <i class="fa-solid fa-users me-1"></i>Collaborative Trip Planning
+        </span>
+        <h1 class="section-title mb-1">{{ trip.title }}</h1>
+        <p class="muted mb-0">
+          Destination: <strong>{{ trip.destination.name }}</strong> &middot; {{ trip.days }} Days &middot; Host: <strong>{{ group.owner.username }}</strong>
+        </p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'trip_detail' trip.pk %}" class="btn btn-outline-secondary rounded-pill">
+          <i class="fa-solid fa-route me-1"></i>View Full Itinerary
+        </a>
+        <a href="{% url 'budget' trip.pk %}" class="btn btn-outline-primary rounded-pill">
+          <i class="fa-solid fa-wallet me-1"></i>Trip Budget
+        </a>
+        {% if not is_owner %}
+          <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to leave this group trip?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="leave">
+            <button type="submit" class="btn btn-outline-danger rounded-pill">
+              <i class="fa-solid fa-arrow-right-from-bracket me-1"></i>Leave Group
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Group Invite and Members Grid -->
+    <div class="row g-4 mb-4">
+      <!-- Invite & Share Card -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0">Group Invite Code</h4>
+            <span class="badge text-bg-info rounded-pill px-3 py-1">Shareable</span>
+          </div>
+          <p class="small muted mb-3">
+            Share this code or link with friends so they can join, view the itinerary, and vote on attractions.
+          </p>
+
+          <div class="p-3 bg-light rounded-4 border text-center mb-3">
+            <div class="small text-muted mb-1">Unique Invite Code</div>
+            <div class="display-6 fw-bold text-primary font-monospace letter-spacing-1" id="inviteCodeText">
+              {{ group.invite_code }}
+            </div>
+            <div class="mt-2 d-flex justify-content-center gap-2">
+              <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="copyInviteCode()">
+                <i class="fa-regular fa-copy me-1"></i><span id="copyBtnText">Copy Code</span>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="copyInviteLink()">
+                <i class="fa-solid fa-link me-1"></i><span id="copyLinkBtnText">Copy Link</span>
+              </button>
+            </div>
+          </div>
+
+          {% if is_owner %}
+            <hr class="my-3">
+            <h5 class="fw-bold mb-2">Invite by Username</h5>
+            <form method="post" class="d-flex gap-2">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="add">
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fa-regular fa-user text-muted"></i></span>
+                <input class="form-control" name="username" placeholder="SmartTrip username" required>
+              </div>
+              <button type="submit" class="btn btn-primary rounded-pill px-3">
+                <i class="fa-solid fa-user-plus me-1"></i>Add
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Member Roster Card -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h4 class="fw-bold mb-0">Traveler Roster</h4>
+              <small class="muted">{{ all_members|length }} collaborator{{ all_members|length|pluralize }} in trip</small>
+            </div>
+            <span class="badge text-bg-secondary rounded-pill px-3 py-1">
+              <i class="fa-solid fa-user-group me-1"></i>{{ all_members|length }} Active
+            </span>
+          </div>
+
+          <div class="list-group list-group-flush">
+            <!-- Owner Entry -->
+            <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 border-bottom">
+              <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold" style="width: 42px; height: 42px;">
+                  {{ group.owner.username|slice:":1"|upper }}
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold">{{ group.owner.username }}</h6>
+                  <small class="text-muted">{{ group.owner.email|default:"Trip Organizer" }}</small>
+                </div>
+              </div>
+              <span class="badge text-bg-primary rounded-pill px-3 py-2">
+                <i class="fa-solid fa-crown me-1"></i>Host & Owner
+              </span>
+            </div>
+
+            <!-- Members -->
+            {% for m in members %}
+              <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 border-bottom">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center fw-bold" style="width: 42px; height: 42px;">
+                    {{ m.username|slice:":1"|upper }}
+                  </div>
+                  <div>
+                    <h6 class="mb-0 fw-bold">{{ m.username }}</h6>
+                    <small class="text-muted">{{ m.email|default:"Travel Member" }}</small>
+                  </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge text-bg-light border text-dark rounded-pill px-3 py-2">
+                    <i class="fa-solid fa-user-check me-1"></i>Member
+                  </span>
+                  {% if is_owner %}
+                    <form method="post" class="d-inline" onsubmit="return confirm('Remove {{ m.username }} from the group?');">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="remove">
+                      <input type="hidden" name="member_id" value="{{ m.id }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle" title="Remove member" style="width: 32px; height: 32px; padding: 0;">
+                        <i class="fa-solid fa-xmark"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+              </div>
+            {% empty %}
+              <div class="py-4 text-center text-muted">
+                <i class="fa-solid fa-user-group fa-2x mb-2 d-block"></i>
+                <p class="mb-1">No group members have joined yet.</p>
+                <small>Invite friends with the invite code above to start collaborating!</small>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group Preference Profile -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+        <div>
+          <span class="badge text-bg-light border text-dark rounded-pill px-3 py-1 mb-1">
+            <i class="fa-solid fa-brain me-1"></i>Group Preference Aggregation
+          </span>
+          <h4 class="fw-bold mb-0">Fairness-adjusted group preference profile</h4>
+          <small class="muted">
+            Aggregates member profiles using 70% mean consensus and 30% minority interest protection.
+          </small>
+        </div>
+        {% if is_owner %}
+          <form method="post" onsubmit="return confirm('Re-optimize the itinerary around the group\'s consensus preferences?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="optimize">
+            <button type="submit" class="btn btn-success rounded-pill px-4 shadow-sm">
+              <i class="fa-solid fa-wand-magic-sparkles me-2"></i>Optimize Group Itinerary
+            </button>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="row g-3 mt-1">
+        {% for category, value in group_preferences %}
+          <div class="col-md-6 col-xl-4">
+            <div class="p-3 bg-light rounded-4 border h-100">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-semibold text-capitalize text-dark">{{ category }}</span>
+                <span class="badge text-bg-primary rounded-pill">{{ value|floatformat:2 }}</span>
+              </div>
+              <div class="progress" style="height: 10px;">
+                <div class="progress-bar bg-primary" role="progressbar"
+                     style="width: {% widthratio value 1 100 %}%;"
+                     aria-valuenow="{% widthratio value 1 100 %}" aria-valuemin="0" aria-valuemax="100">
+                </div>
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <div class="col-12 py-3 text-center text-muted">
+            <p class="mb-0">Add group members or interact with attractions to build the group profile.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Attraction Voting & Group Consensus -->
+    <div class="card border-0 shadow-sm rounded-4 p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <span class="badge text-bg-light border text-dark rounded-pill px-3 py-1 mb-1">
+            <i class="fa-solid fa-square-poll-vertical me-1"></i>Democracy in Planning
+          </span>
+          <h4 class="fw-bold mb-0">Attraction Voting & Group Consensus</h4>
+          <small class="muted">Every member can vote on the attractions selected for this trip.</small>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" style="width: 80px;">Day</th>
+              <th scope="col">Attraction</th>
+              <th scope="col">Category</th>
+              <th scope="col">Duration</th>
+              <th scope="col">Est. Cost</th>
+              <th scope="col" class="text-center">Group Votes</th>
+              <th scope="col" class="text-end">Your Vote</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+              <tr>
+                <td>
+                  <span class="badge text-bg-primary rounded-pill px-3 py-1">
+                    Day {{ item.day_number }}
+                  </span>
+                </td>
+                <td>
+                  <strong class="text-dark">{{ item.attraction.name }}</strong>
+                  {% if item.reason %}
+                    <small class="text-muted d-block">{{ item.reason|truncatewords:10 }}</small>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge text-bg-secondary rounded-pill px-2 py-1 text-capitalize">
+                    {{ item.attraction.category|default:"Sightseeing" }}
+                  </span>
+                </td>
+                <td>{{ item.attraction.duration|default:2.0 }}h</td>
+                <td>{% if item.attraction.estimated_cost == 0 %}Free{% else %}₹{{ item.attraction.estimated_cost }}{% endif %}</td>
+                <td class="text-center">
+                  <span class="badge text-bg-success rounded-pill px-2 py-1 me-1">
+                    <i class="fa-solid fa-thumbs-up me-1"></i>{{ item.likes }}
+                  </span>
+                  <span class="badge text-bg-danger rounded-pill px-2 py-1">
+                    <i class="fa-solid fa-thumbs-down me-1"></i>{{ item.dislikes }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <form method="post" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="vote">
+                      <input type="hidden" name="attraction_id" value="{{ item.attraction.id }}">
+                      <input type="hidden" name="vote" value="like">
+                      <button type="submit" class="btn {% if item.user_vote == 'like' %}btn-success{% else %}btn-outline-success{% endif %}" title="Vote Like">
+                        <i class="fa-solid fa-thumbs-up"></i>
+                      </button>
+                    </form>
+                    <form method="post" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="vote">
+                      <input type="hidden" name="attraction_id" value="{{ item.attraction.id }}">
+                      <input type="hidden" name="vote" value="dislike">
+                      <button type="submit" class="btn {% if item.user_vote == 'dislike' %}btn-danger{% else %}btn-outline-danger{% endif %}" title="Vote Dislike">
+                        <i class="fa-solid fa-thumbs-down"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                  No itinerary items found for this trip. Generate an itinerary first!
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<script>
+function copyInviteCode() {
+  const code = "{{ group.invite_code }}";
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById("copyBtnText");
+    btn.innerText = "Copied!";
+    setTimeout(() => { btn.innerText = "Copy Code"; }, 2000);
+  });
+}
+
+function copyInviteLink() {
+  const link = window.location.origin + "{% url 'join_group_trip' %}?code={{ group.invite_code }}";
+  navigator.clipboard.writeText(link).then(() => {
+    const btn = document.getElementById("copyLinkBtnText");
+    btn.innerText = "Link Copied!";
+    setTimeout(() => { btn.innerText = "Copy Link"; }, 2000);
+  });
+}
+</script>
+{% endblock %}

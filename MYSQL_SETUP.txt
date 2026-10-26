@@ -1,0 +1,11 @@
+SMARTTRIP AI - MYSQL FIRST RUN
+
+1. Install and start MySQL Server.
+2. Back up your existing smarttrip database before applying migrations.
+3. Run: mysql -u root -p < database\create_mysql_database.sql
+   Or execute the SQL file in MySQL Workbench. It only creates smarttrip if missing.
+4. Copy .env.example to .env and set DB_USER / DB_PASSWORD. Keep DB_ENGINE=mysql and DB_NAME=smarttrip.
+5. Configure SMTP credentials in .env before testing email OTP.
+6. Run START_HERE.bat.
+
+The setup does not drop or erase tables. Check your existing migration history before running migrations.

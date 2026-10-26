@@ -1,1 +1,81 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="planner-card mx-auto"><h1>What-if Trip Planning</h1><p>Test changes without modifying your main trip.</p><form method="post">{% csrf_token %}{{form.as_p}}<button class="btn btn-primary">Run Scenario</button></form>{% if result %}<hr><h4>Scenario result</h4><p>Budget: ₹{{result.budget}}</p><p>Days: {{result.days}}</p><p>Estimated cost: ₹{{result.estimated}}</p><p>Feasible: {{result.feasible}}</p>{% endif %}</div></div>{% endblock %}
+{% extends "travel/base.html" %}
+{% block title %}What-If Planning | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section py-5">
+  <div class="container-xl" style="max-width: 760px;">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div>
+        <span class="eyebrow">Scenario Simulation</span>
+        <h1 class="h3 fw-bold mb-1">What-If Trip Planning</h1>
+        <p class="muted mb-0">Simulate budget or duration adjustments without altering your saved itinerary.</p>
+      </div>
+      <a href="{% url 'trip_detail' trip.pk %}" class="btn btn-outline-secondary rounded-pill">
+        <i class="fa-solid fa-arrow-left me-1"></i>Back to Trip
+      </a>
+    </div>
+
+    <div class="section-card mb-4">
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          {{ form.as_p }}
+        </div>
+        <button type="submit" class="btn btn-primary rounded-pill px-4">
+          <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Run Scenario Simulation
+        </button>
+      </form>
+    </div>
+
+    {% if result %}
+      <div class="section-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h3 class="h5 fw-bold mb-0">Simulation Outcome</h3>
+          {% if result.feasible %}
+            <span class="badge text-bg-success rounded-pill px-3 py-2">
+              <i class="fa-solid fa-circle-check me-1"></i>Feasible Plan
+            </span>
+          {% else %}
+            <span class="badge text-bg-danger rounded-pill px-3 py-2">
+              <i class="fa-solid fa-triangle-exclamation me-1"></i>Budget Exceeded
+            </span>
+          {% endif %}
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-3 bg-body-tertiary">
+              <small class="muted d-block">Simulated Budget</small>
+              <strong class="fs-5">₹{{ result.budget }}</strong>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-3 bg-body-tertiary">
+              <small class="muted d-block">Simulated Duration</small>
+              <strong class="fs-5">{{ result.days }} Days</strong>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-3 bg-body-tertiary">
+              <small class="muted d-block">Estimated Spend</small>
+              <strong class="fs-5">₹{{ result.estimated }}</strong>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-3 bg-body-tertiary">
+              <small class="muted d-block">Feasibility</small>
+              <strong class="fs-5 {% if result.feasible %}text-success{% else %}text-danger{% endif %}">
+                {% if result.feasible %}Pass{% else %}Over Budget{% endif %}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <p class="small muted mb-0">
+          <i class="fa-solid fa-circle-info me-1"></i>This simulation is experimental and leaves your saved trip itinerary intact.
+        </p>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

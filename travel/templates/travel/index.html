@@ -1,14 +1,80 @@
-{% extends "travel/base.html" %}{% block title %}SmartTrip AI{% endblock %}{% block content %}
-<section class="hero"><div class="container py-5"><div class="row align-items-center hero-row"><div class="col-lg-7">
-<span class="badge bg-light text-dark mb-3">Intelligent travel planning</span><h1 class="display-3 fw-bold">Build trips around your preferences.</h1>
-<p class="lead">SmartTrip AI scores attractions, checks feasibility, optimizes your itinerary and adapts your plan.</p>
-<a href="{% url 'trip_planner' %}" class="btn btn-light btn-lg me-2">Plan a Trip</a><a href="{% url 'destinations' %}" class="btn btn-outline-light btn-lg">Explore</a>
-</div><div class="col-lg-5"><div class="hero-card"><div class="small">MULTI-OBJECTIVE PLANNING</div><h3>Interest + Budget + Time + Sustainability + Crowd</h3>
-<div class="mini-grid"><span>Personalized</span><span>Explainable</span><span>Adaptive</span><span>Research-ready</span></div></div></div></div></div></section>
-<section class="container py-5"><div class="row g-4">
-<div class="col-md-4"><div class="feature-card"><h4>Recommendation engine</h4><p>Combines interests, feedback, hidden-gem score, sustainability and crowd pressure.</p></div></div>
-<div class="col-md-4"><div class="feature-card"><h4>Itinerary optimizer</h4><p>Balances trip pace, attraction scores and daily activity capacity.</p></div></div>
-<div class="col-md-4"><div class="feature-card"><h4>Dynamic planning</h4><p>Prepares alternatives for weather or changed trip assumptions.</p></div></div>
-</div></section><section class="container pb-5"><h2>Featured destinations</h2><div class="row g-4 mt-1">
-{% for d in featured %}<div class="col-md-6 col-lg-4"><div class="card destination-card h-100"><img src="{{d.image_url}}" class="card-img-top"><div class="card-body"><span class="badge text-bg-light">{{d.state}}</span><h4 class="mt-2">{{d.name}}</h4><p>{{d.description}}</p><a href="{% url 'destination_detail' d.pk %}" class="btn btn-outline-dark">Explore</a></div></div></div>{% endfor %}
-</div></section>{% endblock %}
+{% extends "travel/base.html" %}
+{% load static %}
+{% block title %}SmartTrip AI | Plan better trips{% endblock %}
+{% block content %}
+<section class="hero-home">
+<div class="container-xl py-5">
+<div class="row align-items-center g-5 w-100">
+<div class="col-lg-7">
+<span class="hero-kicker mb-4"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>AI-powered travel planning</span>
+<h1 class="hero-title">Your trip. Planned around you.</h1>
+<p class="hero-copy my-4">Discover destinations, build personalized itineraries, manage your budget, adapt to weather and travel with a smarter plan.</p>
+<form class="search-panel d-flex gap-2" method="get" action="{% url 'destinations' %}">
+<input id="heroSearch" name="q" class="form-control border-0" placeholder="Search destinations, cities or experiences...">
+<button class="btn btn-primary rounded-4 px-4 d-flex align-items-center" type="submit">
+<i class="fa-solid fa-magnifying-glass me-2"></i>Explore
+</button>
+</form>
+<div class="d-flex flex-wrap gap-2 mt-3">
+  <a class="btn btn-sm btn-outline-light rounded-pill px-3" href="{% url 'trip_copilot' %}">
+    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Try AI Copilot
+  </a>
+  <a class="btn btn-sm btn-outline-light rounded-pill px-3" href="{% url 'trip_planner' %}">
+    <i class="fa-solid fa-calendar-plus me-1"></i>Plan a Trip
+  </a>
+</div>
+<div class="d-flex gap-4 mt-4 small text-white-50"><span><b class="text-white">6+</b> destinations</span><span><b class="text-white">AI</b> recommendations</span><span><b class="text-white">Smart</b> replanning</span></div>
+</div>
+<div class="col-lg-5">
+<div class="glass-card">
+<div class="small text-uppercase opacity-75 mb-2">SmartTrip planning engine</div>
+<h3 class="fw-bold">One workspace for your whole trip.</h3>
+<div class="row g-2 mt-3">
+<div class="col-6"><div class="p-3 rounded-4 bg-white bg-opacity-10">Personalized</div></div>
+<div class="col-6"><div class="p-3 rounded-4 bg-white bg-opacity-10">Explainable</div></div>
+<div class="col-6"><div class="p-3 rounded-4 bg-white bg-opacity-10">Weather-aware</div></div>
+<div class="col-6"><div class="p-3 rounded-4 bg-white bg-opacity-10">Budget-aware</div></div>
+</div>
+</div>
+</div>
+</div></div>
+</section>
+
+<section class="section">
+<div class="container-xl">
+<div class="d-flex justify-content-between align-items-end mb-4"><div><div class="eyebrow">Explore</div><h2 class="section-title mb-0">Popular destinations</h2></div><a href="{% url 'destinations' %}" class="text-decoration-none fw-bold">View all →</a></div>
+<div class="row g-4">
+{% for d in popular %}
+<div class="col-md-6 col-lg-4">
+  <div class="travel-card h-100 d-flex flex-column">
+    {% if d.name == 'Mysuru' %}
+      <img src="{% static 'travel/images/mysuru-palace.jpg' %}" alt="{{ d.name }}" style="display:block; width:100%; height:210px; object-fit:cover;">
+    {% else %}
+      <img src="{{ d.image_url|default:'' }}" alt="{{ d.name }}" style="display:block; width:100%; height:210px; object-fit:cover;" onerror="this.onerror=null; this.src='https://placehold.co/800x500/eaf2f5/24445c?text={{ d.name|urlencode }}';">
+    {% endif %}
+    <div class="card-body d-flex flex-column flex-grow-1">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="chip">{{ d.state }}</span>
+        <span class="rating"><i class="fa-solid fa-star text-warning"></i> {{ d.rating }}</span>
+      </div>
+      <h4 class="mt-2 fw-bold text-dark">{{ d.name }}</h4>
+      <p class="muted flex-grow-1">{{ d.description|truncatewords:18 }}</p>
+      <div class="d-flex justify-content-between align-items-center pt-2 border-top border-light-subtle">
+        <small class="muted fw-semibold">From ₹{{ d.average_daily_cost }}/day</small>
+        <a href="{% url 'destination_detail' d.pk %}" class="btn btn-dark rounded-pill px-3">Explore</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div></div>
+</section>
+
+<section class="section pt-0">
+<div class="container-xl"><div class="row g-4">
+<div class="col-md-4"><div class="metric-card h-100"><div class="eyebrow">01</div><h4>Personalized recommendations</h4><p class="muted mb-0">Your interests, feedback, sustainability preferences and trip history influence attraction ranking.</p></div></div>
+<div class="col-md-4"><div class="metric-card h-100"><div class="eyebrow">02</div><h4>Intelligent itinerary</h4><p class="muted mb-0">SmartTrip balances time, pace, route distance, activity variety, budget and attraction scores.</p></div></div>
+<div class="col-md-4"><div class="metric-card h-100"><div class="eyebrow">03</div><h4>Adaptive planning</h4><p class="muted mb-0">Weather changes, what-if scenarios and group preferences feed back into your plan.</p></div></div>
+</div></div>
+</section>
+{% endblock %}

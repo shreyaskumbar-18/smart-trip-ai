@@ -1,0 +1,310 @@
+{% extends "travel/base.html" %}
+{% load static %}
+{% block title %}AI Copilot | {{ trip.title }} | SmartTrip AI{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endblock %}
+
+{% block content %}
+<section class="section pt-5 pb-5">
+  <div class="container-xl">
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+      <div>
+        <span class="badge text-bg-primary rounded-pill px-3 py-2 mb-2">
+          <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Trip Copilot & Refinement Hub
+        </span>
+        <h1 class="section-title mb-1">{{ trip.title }}</h1>
+        <p class="muted mb-0">
+          <strong>{{ trip.destination.name }}</strong> &middot; {{ trip.days }} Days &middot; {{ trip.travelers }} Traveler(s) &middot; Pace: <span class="badge text-bg-light border text-dark text-capitalize">{{ trip.pace }}</span>
+        </p>
+      </div>
+
+      <!-- Quick Action Pills -->
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'trip_detail' trip.pk %}" class="btn btn-outline-secondary rounded-pill">
+          <i class="fa-solid fa-route me-1"></i>Trip Overview
+        </a>
+        <a href="{% url 'budget' trip.pk %}" class="btn btn-outline-primary rounded-pill">
+          <i class="fa-solid fa-wallet me-1"></i>Budget
+        </a>
+        <a href="{% url 'group' trip.pk %}" class="btn btn-outline-success rounded-pill">
+          <i class="fa-solid fa-users me-1"></i>Collaborate
+        </a>
+        <a href="{% url 'decision_lab' trip.pk %}" class="btn btn-outline-info rounded-pill">
+          <i class="fa-solid fa-flask-vial me-1"></i>Decision Lab
+        </a>
+        <a href="{% url 'export_trip_pdf' trip.pk %}" class="btn btn-dark rounded-pill">
+          <i class="fa-solid fa-file-pdf me-1"></i>Export PDF
+        </a>
+      </div>
+    </div>
+
+    <!-- Conversational Refinement Console -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden border-start border-4 border-primary">
+      <div class="card-body p-4 p-md-5">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-primary fs-4"></i>
+          <h4 class="fw-bold mb-0">Conversational Itinerary Refinement</h4>
+        </div>
+        <p class="text-muted small mb-3">
+          Type instructions in natural language to adjust the schedule. Copilot interprets your goals and applies minimum-disruption adjustments.
+        </p>
+
+        <form method="post" action="{% url 'trip_copilot_detail' trip.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="refine">
+
+          <div class="input-group input-group-lg shadow-sm rounded-4 overflow-hidden border mb-3">
+            <input type="text"
+                   name="prompt"
+                   id="refinePromptInput"
+                   class="form-control border-0 px-4 py-3 fs-6"
+                   placeholder="e.g. Make the itinerary more relaxed, reduce the budget, or replan for rain..."
+                   required>
+            <button class="btn btn-primary px-4 fw-semibold" type="submit">
+              <i class="fa-solid fa-paper-plane me-1"></i>Refine Itinerary
+            </button>
+          </div>
+
+          <!-- Quick Refinement Shortcut Pills -->
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <small class="text-muted fw-semibold">Quick adjustments:</small>
+            <button type="button" class="btn btn-sm btn-light border rounded-pill py-1 px-3 refine-chip"
+                    data-prompt="Make the itinerary more relaxed with unhurried visits">
+              <i class="fa-solid fa-mug-hot text-primary me-1"></i>Make more relaxed
+            </button>
+            <button type="button" class="btn btn-sm btn-light border rounded-pill py-1 px-3 refine-chip"
+                    data-prompt="Reduce the budget and swap for free attractions">
+              <i class="fa-solid fa-piggy-bank text-success me-1"></i>Cut budget / Prefer free
+            </button>
+            <button type="button" class="btn btn-sm btn-light border rounded-pill py-1 px-3 refine-chip"
+                    data-prompt="Add more nature activities and scenic viewpoints">
+              <i class="fa-solid fa-leaf text-success me-1"></i>More nature activities
+            </button>
+            <button type="button" class="btn btn-sm btn-light border rounded-pill py-1 px-3 refine-chip"
+                    data-prompt="Replan with weather alternatives for rain protection">
+              <i class="fa-solid fa-cloud-rain text-info me-1"></i>Weather-aware replan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Active Itinerary & Interactive Route Map Row -->
+    <div class="row g-4 mb-5">
+      <!-- Left: Day-by-Day Timeline -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h4 class="fw-bold mb-0">Active Schedule</h4>
+              <small class="muted">{{ trip.items.count }} scheduled activity stops</small>
+            </div>
+            <span class="badge text-bg-light border text-dark rounded-pill px-3 py-2">
+              Est. Ticket Spend: ₹{{ trip.estimated_total }}
+            </span>
+          </div>
+
+          {% for day in groups %}
+            <div class="mb-4">
+              <div class="d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom">
+                <span class="badge text-bg-primary rounded-pill px-3 py-1">Day {{ day.number }}</span>
+                <small class="text-muted">
+                  <i class="fa-solid fa-cloud-sun me-1"></i>{{ day.weather.condition }} &middot; {{ day.weather.source }}
+                </small>
+              </div>
+
+              <div class="list-group list-group-flush">
+                {% for item in day.items %}
+                  <div class="list-group-item px-0 py-2 border-0">
+                    <div class="d-flex align-items-start gap-3">
+                      <span class="badge text-bg-light border text-dark rounded-pill px-2 py-1 small mt-1 font-monospace">
+                        {{ item.start_time|time:"H:i"|default:"09:00" }}
+                      </span>
+                      <div class="flex-grow-1">
+                        <strong class="text-dark d-block">{{ item.attraction.name }}</strong>
+                        <small class="text-muted d-block">{{ item.attraction.category|title }} &middot; Duration {{ item.attraction.duration_hours }}h &middot; {% if item.attraction.estimated_cost == 0 %}Free{% else %}₹{{ item.attraction.estimated_cost }}{% endif %}</small>
+                        {% if item.reason %}
+                          <p class="small text-muted mb-0 mt-1" style="font-size: 0.8rem;">
+                            <i class="fa-regular fa-lightbulb text-warning me-1"></i>{{ item.reason }}
+                          </p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                {% empty %}
+                  <p class="text-muted small py-2">No activities scheduled for this day.</p>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Right: Interactive Route Map -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h4 class="fw-bold mb-0">Interactive Route Map</h4>
+              <small class="muted">Color-coded daily sequencing</small>
+            </div>
+          </div>
+
+          <div id="copilotMap" class="rounded-4 overflow-hidden border" style="height: 480px; min-height: 400px;"></div>
+          <div id="copilotMapTileNotice" class="small text-muted mt-2" role="status" aria-live="polite" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Switch Planning Profile Section -->
+    <div class="card border-0 shadow-sm rounded-4 p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <span class="badge text-bg-light border text-dark rounded-pill px-3 py-1 mb-1">
+            <i class="fa-solid fa-code-compare me-1"></i>Alternative Profiles
+          </span>
+          <h4 class="fw-bold mb-0">Switch Planning Profile</h4>
+          <small class="muted">Re-generate this trip using one of the other Pareto-differentiated alternative strategies.</small>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        {% for alt in alternatives %}
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded-4 border h-100 d-flex flex-column justify-content-between">
+              <div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge text-bg-{{ alt.badge_color }} rounded-pill px-3 py-1">
+                    <i class="fa-solid {{ alt.icon }} me-1"></i>{{ alt.title }}
+                  </span>
+                  <strong>₹{{ alt.estimated_cost }}</strong>
+                </div>
+                <p class="small text-muted mb-2">{{ alt.strategy }}</p>
+                <small class="text-muted d-block mb-3">
+                  <i class="fa-solid fa-location-dot me-1"></i>{{ alt.stop_count }} stops &middot; ~{{ alt.travel_distance_km }} km &middot; Eco: {{ alt.avg_sustainability }}/100
+                </small>
+              </div>
+
+              {% if is_owner %}
+                <form method="post" action="{% url 'trip_copilot_detail' trip.pk %}" onsubmit="return confirm('Switch itinerary to {{ alt.title }}?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="apply_alternative">
+                  <input type="hidden" name="alternative_key" value="{{ alt.key }}">
+                  <button type="submit" class="btn btn-outline-{{ alt.badge_color }} btn-sm rounded-pill w-100 fw-semibold">
+                    Apply {{ alt.title }}
+                  </button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Map Script -->
+{{ map_config|json_script:"map-config-data" }}
+<script>
+document.querySelectorAll(".refine-chip").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById("refinePromptInput");
+    if (input) {
+      input.value = btn.dataset.prompt;
+      input.focus();
+    }
+  });
+});
+
+const routePoints = {{ route_points|safe }};
+const mapConfigNode = document.getElementById("map-config-data");
+let mapConfig = {};
+try { mapConfig = JSON.parse(mapConfigNode?.textContent || "{}"); } catch (_) { mapConfig = {}; }
+if (document.getElementById("copilotMap") && typeof L !== "undefined") {
+  const map = L.map("copilotMap");
+  const tileNotice = document.getElementById("copilotMapTileNotice");
+  const tileUrl = (mapConfig.tile_url || "").trim();
+  const tileAttribution = (mapConfig.tile_attribution || "").trim();
+  let tileLayer = null;
+  let tileFailureShown = false;
+  if (tileUrl && tileAttribution) {
+    tileLayer = L.tileLayer(tileUrl, { maxZoom: 19, attribution: tileAttribution });
+    tileLayer.on("tileerror", () => {
+      if (tileFailureShown) return;
+      tileFailureShown = true;
+      tileLayer.remove();
+      if (tileNotice) {
+        tileNotice.textContent = "The configured map tile provider failed. Stops and routes remain available.";
+        tileNotice.hidden = false;
+      }
+    });
+    tileLayer.addTo(map);
+  } else if (tileNotice) {
+    tileNotice.textContent = "Map tiles are not configured. Stops and routes remain available.";
+    tileNotice.hidden = false;
+  }
+
+  const colors = ["#2563eb", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"];
+
+  if (routePoints.length > 0) {
+    const markers = [];
+    const daySegments = {};
+
+    routePoints.forEach((pt) => {
+      const dayColor = colors[(pt.day - 1) % colors.length];
+      const marker = L.circleMarker([pt.lat, pt.lon], {
+        radius: 9,
+        fillColor: dayColor,
+        color: "#ffffff",
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.9
+      }).addTo(map);
+
+      marker.bindPopup(`
+        <div style="min-width: 170px;">
+          <span style="background:${dayColor}; color:#fff; padding:2px 8px; border-radius:12px; font-size:11px;">Day ${pt.day}</span>
+          <strong style="display:block; margin-top:5px; font-size:14px;">${pt.name}</strong>
+          <small style="color:#64748b; display:block;">${pt.category} &middot; ${pt.time || 'Scheduled'}</small>
+          <small style="color:#16a34a; font-weight:600;">Cost: ${pt.cost === 0 ? 'Free' : '₹' + pt.cost}</small>
+        </div>
+      `);
+      markers.push([pt.lat, pt.lon]);
+
+      if (!daySegments[pt.day]) daySegments[pt.day] = [];
+      daySegments[pt.day].push([pt.lat, pt.lon]);
+    });
+
+    Object.keys(daySegments).forEach((dayNum) => {
+      const segCoords = daySegments[dayNum];
+      if (segCoords.length > 1) {
+        const segColor = colors[(dayNum - 1) % colors.length];
+        L.polyline(segCoords, {
+          color: segColor,
+          weight: 4,
+          opacity: 0.8,
+          dashArray: "6, 8"
+        }).addTo(map);
+      }
+    });
+
+    if (markers.length === 1) {
+      map.setView(markers[0], 13);
+    } else {
+      map.fitBounds(markers, { padding: [35, 35] });
+    }
+  } else {
+    map.setView([20.5937, 78.9629], 5);
+  }
+  window.addEventListener("pagehide", event => {
+    if (!event.persisted) map.remove();
+  });
+}
+</script>
+{% endblock %}

@@ -1,1 +1,172 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="auth-card mx-auto"><h2>Create account</h2><form method="post">{% csrf_token %}{{form.as_p}}<button class="btn btn-primary w-100">Register</button></form></div></div>{% endblock %}
+
+{% extends "travel/base.html" %}
+
+{% block title %}Create your account | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="register-page">
+    <div class="register-shell">
+
+        <!-- Left travel-inspired panel -->
+        <aside class="register-showcase">
+
+            <a class="register-brand" href="{% url 'home' %}">
+                <span class="register-brand-mark">
+                    <i class="fa-solid fa-compass"></i>
+                </span>
+                <span>SmartTrip <b>AI</b></span>
+            </a>
+
+            <div class="showcase-copy">
+                <span class="showcase-kicker">
+                    ✦ YOUR NEXT CHAPTER STARTS HERE
+                </span>
+
+                <h2>
+                    More than a trip.<br>
+                    <span>A story to remember.</span>
+                </h2>
+
+                <p>
+                    Plan smarter, discover hidden gems, and turn your
+                    travel ideas into journeys worth sharing.
+                </p>
+
+                <div class="showcase-points">
+                    <div>
+                        <span class="showcase-point-icon">
+                            <i class="fa-solid fa-route"></i>
+                        </span>
+                        <span>
+                            <strong>Personalized itineraries</strong>
+                            <small>Plans shaped around you</small>
+                        </span>
+                    </div>
+
+                    <div>
+                        <span class="showcase-point-icon">
+                            <i class="fa-solid fa-wallet"></i>
+                        </span>
+                        <span>
+                            <strong>Travel within your budget</strong>
+                            <small>Spend smarter, explore more</small>
+                        </span>
+                    </div>
+
+                    <div>
+                        <span class="showcase-point-icon">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                        </span>
+                        <span>
+                            <strong>Find places worth knowing</strong>
+                            <small>From famous sights to hidden gems</small>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="showcase-footer">
+                <span>
+                    <i class="fa-solid fa-shield-halved"></i>
+                    Your journey, your preferences
+                </span>
+                <span>SMARTTRIP AI · EXPLORE MORE</span>
+            </div>
+        </aside>
+
+        <!-- Registration form -->
+        <main class="register-form-panel">
+
+            <a class="register-mobile-brand" href="{% url 'home' %}">
+                <span class="register-brand-mark">
+                    <i class="fa-solid fa-compass"></i>
+                </span>
+                <span>SmartTrip <b>AI</b></span>
+            </a>
+
+            <div class="register-form-heading">
+                <span class="register-eyebrow">JOIN THE JOURNEY</span>
+
+                <h1>Create your account<span>.</span></h1>
+
+                <p>
+                    Start planning trips that feel like they were
+                    made just for you.
+                </p>
+            </div>
+
+            <div class="register-security-note">
+                <span class="security-icon">
+                    <i class="fa-regular fa-envelope"></i>
+                </span>
+
+                <span>
+                    <strong>Email verification keeps your account secure</strong>
+                    <small>
+                        We'll ask you to verify your email with a 6-digit OTP.
+                    </small>
+                </span>
+            </div>
+
+            <form method="post" class="register-form">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="register-errors" role="alert">
+                        {% for error in form.non_field_errors %}
+                            <p>{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% for field in form %}
+                    <div class="register-field{% if field.errors %} has-error{% endif %}">
+
+                        <label for="{{ field.id_for_label }}">
+                            {{ field.label }}
+                        </label>
+
+                        {{ field }}
+
+                        {% if field.help_text %}
+                            <div class="register-help">
+                                {{ field.help_text|safe }}
+                            </div>
+                        {% endif %}
+
+                        {% if field.errors %}
+                            <div class="register-field-errors" role="alert">
+                                {% for error in field.errors %}
+                                    <span>
+                                        <i class="fa-solid fa-circle-exclamation"></i>
+                                        {{ error }}
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+                {% endfor %}
+
+                <button type="submit" class="register-submit">
+                    <span>Create my account</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+
+                <p class="register-terms">
+                    Create your account and get ready for your next
+                    adventure with SmartTrip AI.
+                </p>
+            </form>
+
+            <div class="register-login">
+                Already have an account?
+                <a href="{% url 'login' %}">
+                    Log in <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+
+        </main>
+    </div>
+</section>
+{% endblock %}

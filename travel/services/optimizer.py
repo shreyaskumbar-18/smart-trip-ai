@@ -1,6 +1,7 @@
 from datetime import time
 
 from .recommendation import recommendation_score, explain
+from .route_algorithms import nearest_neighbor_two_opt
 
 
 PACE_ACTIVITIES = {
@@ -48,58 +49,20 @@ def _diversify_selection(ranked, limit):
 
 
 def _distance(a, b):
-    """Approximate geographic distance using latitude/longitude."""
-    if (
-        a.latitude is None
-        or a.longitude is None
-        or b.latitude is None
-        or b.longitude is None
-    ):
+    """Return great-circle distance in kilometres using the Haversine formula."""
+    if a.latitude is None or a.longitude is None or b.latitude is None or b.longitude is None:
         return None
-
-    lat1, lon1 = float(a.latitude), float(a.longitude)
-    lat2, lon2 = float(b.latitude), float(b.longitude)
-
-    # Local equirectangular approximation, sufficient for city-scale ordering.
-    from math import cos, radians, sqrt
-
-    x = radians(lon2 - lon1) * cos(radians((lat1 + lat2) / 2))
-    y = radians(lat2 - lat1)
-    return sqrt(x * x + y * y)
+    from math import asin, cos, radians, sin, sqrt
+    lat1, lon1 = radians(float(a.latitude)), radians(float(a.longitude))
+    lat2, lon2 = radians(float(b.latitude)), radians(float(b.longitude))
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    hav = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    return 6371.0 * 2 * asin(min(1.0, sqrt(hav)))
 
 
 def _route_order(attractions):
-    """Order attractions to reduce travel between consecutive POIs."""
-    remaining = list(attractions)
-
-    if len(remaining) <= 2:
-        return remaining
-
-    ordered = [remaining.pop(0)]
-
-    while remaining:
-        current = ordered[-1]
-
-        distances = [
-            (_distance(current, candidate), candidate)
-            for candidate in remaining
-        ]
-
-        usable = [
-            (distance, candidate)
-            for distance, candidate in distances
-            if distance is not None
-        ]
-
-        if not usable:
-            ordered.extend(remaining)
-            break
-
-        _, nearest = min(usable, key=lambda pair: pair[0])
-        ordered.append(nearest)
-        remaining.remove(nearest)
-
-    return ordered
+    """Order attractions with nearest-neighbour followed by 2-opt improvement."""
+    return nearest_neighbor_two_opt(list(attractions), _distance)
 
 
 def optimize_trip(trip, attractions, feedback_ids=None):

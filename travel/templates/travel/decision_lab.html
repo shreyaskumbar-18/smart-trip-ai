@@ -1,0 +1,239 @@
+{% extends 'travel/base.html' %}
+{% block title %}Decision Lab | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section py-5">
+  <div class="container-xl">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+      <div>
+        <span class="eyebrow">Multi-objective optimization · {{ algorithm_name }}</span>
+        <h1 class="display-6 fw-bold mb-2">Decision Lab</h1>
+        <p class="muted mb-0">Compare feasible alternatives for <strong>{{ trip.title }}</strong> in {{ trip.destination.name }}. Each option balances preference match, sustainability, cost and estimated travel distance.</p>
+      </div>
+      <a class="btn btn-outline-primary rounded-pill" href="{% url 'trip_detail' trip.pk %}">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to itinerary
+      </a>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="metric-card metric-indigo">
+          <small>Available attractions</small>
+          <div class="metric-number">{{ candidate_count }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="metric-card metric-teal">
+          <small>Trip duration</small>
+          <div class="metric-number">{{ trip.days }}<span> days</span></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="metric-card metric-coral">
+          <small>Total budget</small>
+          <div class="metric-number">₹{{ trip.budget }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="metric-card metric-green">
+          <small>Algorithm</small>
+          <div class="metric-number fs-4">NSGA-II</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-info border-0 rounded-4 mb-4">
+      <strong><i class="fa-solid fa-circle-info me-2"></i>How to read these plans:</strong>
+      NSGA-II searches for non-dominated alternatives. One plan might score better on sustainability while another costs less or has a shorter route. Estimates depend on the attraction data available in your database.
+    </div>
+
+    {% if options %}
+      <div class="row g-4">
+      {% for option in options %}
+        <div class="col-lg-4">
+          <article class="section-card h-100 d-flex flex-column {% if forloop.first %}border border-primary shadow-sm{% endif %}">
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
+              <div>
+                <span class="eyebrow">Alternative {{ option.number }}</span>
+                <h2 class="h5 fw-bold mb-0">{% if forloop.first %}Balanced plan{% elif forloop.counter == 2 %}Alternative plan{% else %}Explorer plan{% endif %}</h2>
+              </div>
+              {% if forloop.first %}
+                <span class="chip chip-teal">Pareto option</span>
+              {% endif %}
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <div class="p-3 rounded-3 bg-body-tertiary h-100">
+                  <small class="muted d-block">Preference match</small>
+                  <strong class="fs-5">{{ option.preference_score }}<small class="fs-6 text-muted">/100</small></strong>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="p-3 rounded-3 bg-body-tertiary h-100">
+                  <small class="muted d-block">Sustainability</small>
+                  <strong class="fs-5">{{ option.sustainability_score }}<small class="fs-6 text-muted">/100</small></strong>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="p-3 rounded-3 bg-body-tertiary h-100">
+                  <small class="muted d-block">Itinerary coverage</small>
+                  <strong class="fs-6">{{ option.coverage_score }}<small class="text-muted">/100</small></strong>
+                  <div class="small muted">{{ option.stop_count }} stops</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="p-3 rounded-3 bg-body-tertiary h-100">
+                  <small class="muted d-block">Attraction cost</small>
+                  <strong class="fs-6">₹{{ option.estimated_cost }}</strong>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="p-2 px-3 rounded-3 bg-body-tertiary d-flex justify-content-between align-items-center">
+                  <small class="muted">Route distance</small>
+                  <strong class="small">{{ option.travel_distance_km }} km</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="d-flex justify-content-between small mb-1">
+                <span>Budget remaining</span>
+                <strong>₹{{ option.budget_remaining }}</strong>
+              </div>
+              <div class="progress" role="progressbar" aria-label="Budget used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{% widthratio option.estimated_cost trip.budget 100 %}" style="height: 6px;">
+                <div class="progress-bar bg-primary" style="width:{% widthratio option.estimated_cost trip.budget 100 %}%"></div>
+              </div>
+            </div>
+
+            <h3 class="h6 fw-bold mt-2">Suggested schedule</h3>
+            {% for day in option.days %}
+              {% if day %}
+                <div class="border-start border-2 ps-3 py-1 mb-2">
+                  <small class="eyebrow">Day {{ forloop.counter }}</small>
+                  <ul class="small mb-0 ps-3">
+                    {% for stop in day %}
+                      <li class="mb-1">
+                        <strong>{{ stop.attraction.name }}</strong>
+                        <span class="muted"> · {{ stop.attraction.category }}</span>
+                        <div class="muted small">{{ stop.reason }}</div>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+            {% endfor %}
+
+            <div class="mt-auto pt-3 border-top">
+              <div class="small muted">
+                <i class="fa-solid fa-circle-info me-1"></i>This is a comparison result. It does not overwrite your saved itinerary.
+              </div>
+            </div>
+          </article>
+        </div>
+      {% endfor %}
+      </div>
+    {% else %}
+      <div class="section-card text-center py-5">
+        <i class="fa-solid fa-route fs-1 text-primary mb-3"></i>
+        <h2 class="h4 fw-bold">No alternatives generated</h2>
+        <p class="muted">Add attractions to this destination and try again.</p>
+      </div>
+    {% endif %}
+
+    {% if graph_route %}
+    <section class="section-card mt-4">
+      <span class="eyebrow">Graph shortest path · {{ graph_route.algorithm }}</span>
+      <h2 class="h4 fw-bold mb-1">POI network route analysis</h2>
+      <p class="muted">A* searches a graph of nearby attractions from the first to the last stop in the leading alternative. This is a geographic straight-line estimate, not a road route or travel-time prediction.</p>
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        {% for stop in graph_route.attractions %}
+          <span class="badge rounded-pill text-bg-light border text-dark">{{ forloop.counter }}. {{ stop.name }}</span>
+          {% if not forloop.last %}<i class="fa-solid fa-arrow-right muted small"></i>{% endif %}
+        {% endfor %}
+      </div>
+      <div class="small muted">
+        Estimated graph distance: <strong>{{ graph_route.distance_km }} km</strong>. Graph nodes are attractions with coordinates. Edges connect nearby attractions within the configured radius.
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="section-card mt-4">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+        <div>
+          <span class="eyebrow">0/1 Knapsack</span>
+          <h2 class="h4 fw-bold mb-1">Budget-aware attraction selection</h2>
+          <p class="muted mb-0">A second algorithm selects the highest-value combination of attractions within your attraction budget.</p>
+        </div>
+        <div class="text-end">
+          <small class="muted d-block">Estimated attraction spend</small>
+          <strong class="fs-3">₹{{ knapsack.total_cost }}</strong>
+          <div class="small muted">of ₹{{ trip.budget }}</div>
+        </div>
+      </div>
+
+      <div class="progress mb-3" role="progressbar" aria-label="Knapsack attraction budget used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{% widthratio knapsack.total_cost trip.budget 100 %}" style="height: 8px;">
+        <div class="progress-bar bg-success" style="width:{% widthratio knapsack.total_cost trip.budget 100 %}%"></div>
+      </div>
+
+      {% if knapsack.selected %}
+        <div class="row g-2 mb-3">
+          {% for attraction in knapsack.selected %}
+            <div class="col-md-6 col-xl-4">
+              <div class="p-3 rounded-3 bg-body-tertiary h-100">
+                <strong>{{ attraction.name }}</strong>
+                <div class="small muted">{{ attraction.category }} · ₹{{ attraction.estimated_cost }} per traveller</div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="alert alert-warning">No attraction fits the current budget. Increase the budget or reduce the number of travellers.</p>
+      {% endif %}
+
+      <details class="mt-3">
+        <summary class="fw-semibold text-primary" style="cursor: pointer;">
+          <i class="fa-solid fa-list-check me-1"></i>Why attractions were selected or excluded
+        </summary>
+        <div class="table-responsive mt-3">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Attraction</th>
+                <th>Estimated total cost</th>
+                <th>Decision</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in knapsack.explanations %}
+                <tr>
+                  <td>{{ entry.attraction.name }}</td>
+                  <td>₹{{ entry.cost }}</td>
+                  <td>
+                    {% if entry.selected %}
+                      <span class="badge text-bg-success rounded-pill px-2">Selected</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary rounded-pill px-2">Not selected</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ entry.reason }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <p class="small muted mb-0 mt-3">
+        <i class="fa-solid fa-circle-info me-1"></i>Cost limitation: this knapsack calculation covers attraction costs multiplied by traveller count. Accommodation, transport, meals and other expenses remain in the separate trip budget and feasibility checks.
+      </p>
+    </section>
+
+    <div class="section-card mt-4">
+      <h2 class="h5 fw-bold mb-2">What makes this different?</h2>
+      <p class="muted mb-2">The existing itinerary generator returns one baseline plan. NSGA-II evolves a population of candidate plans using non-dominated sorting, crowding distance, selection, crossover, mutation and budget repair. The 0/1 Knapsack panel provides a separate budget-focused comparison.</p>
+      <p class="muted mb-0">Route distance uses straight-line geographic estimates when coordinates exist. It is not road distance or live travel time. The knapsack cost covers attraction entries only, not accommodation, transport or meals.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

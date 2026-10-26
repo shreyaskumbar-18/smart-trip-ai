@@ -1,1 +1,104 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="assistant-box mx-auto"><h1>SmartTrip Assistant</h1><p>Ask about recommendations, weather, budget, group trips, explanations or what-if planning.</p>{% if answer %}<div class="chat-answer mb-4"><b>Assistant:</b><p class="mb-0">{{answer}}</p></div>{% endif %}<form method="post">{% csrf_token %}<div class="input-group"><input class="form-control" name="question" placeholder="Why was this place recommended?" required><button class="btn btn-primary">Ask</button></div></form></div></div>{% endblock %}
+{% extends "travel/base.html" %}
+{% block title %}AI Travel Assistant | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section pt-5 pb-5">
+    <div class="container-xl">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="assistant-hero mb-4">
+                    <div class="ai-orb">
+                        <i class="fa-solid fa-sparkles"></i>
+                    </div>
+                    <div class="eyebrow text-white-50 mt-3">SmartTrip Intelligence</div>
+                    <h1 class="section-title text-white">Your travel assistant.</h1>
+                    <p class="text-white-50 mb-0">Ask about your itinerary, destinations, routes, weather, budget or trip changes.</p>
+                </div>
+
+                <div class="section-card shadow-sm">
+                    <form method="post">
+                        {% csrf_token %}
+                        <label class="form-label fw-semibold" for="question">What would you like help with?</label>
+                        <div class="input-group input-group-lg">
+                            <input
+                                id="question"
+                                class="form-control"
+                                name="question"
+                                placeholder="How should I adjust my Goa itinerary if it rains?"
+                                value="{{ question|default:'' }}"
+                                required
+                                autofocus
+                            >
+                            <button class="btn btn-primary px-4" type="submit">
+                                <i class="fa-solid fa-arrow-up me-1"></i>Ask
+                            </button>
+                        </div>
+                    </form>
+
+                    {% if answer %}
+                        <div class="assistant-answer mt-4 p-4 rounded-4 bg-light border">
+                            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="ai-answer-icon text-primary fs-5">
+                                        <i class="fa-solid fa-sparkles"></i>
+                                    </span>
+                                    <strong class="text-dark">SmartTrip AI</strong>
+                                </div>
+                                <span class="badge {% if answer_source == 'llm' %}text-bg-success{% else %}text-bg-secondary{% endif %} rounded-pill px-3 py-1">
+                                    {% if answer_source == 'llm' %}
+                                        <i class="fa-solid fa-robot me-1"></i>LLM response
+                                    {% else %}
+                                        <i class="fa-solid fa-shield-halved me-1"></i>Local assistant
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="text-dark lh-base">
+                                {{ answer|linebreaksbr }}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <div class="muted small fw-semibold text-uppercase mb-2">TRY ASKING</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="prompt-chip btn btn-sm btn-outline-secondary rounded-pill" type="button" data-prompt="How do I reduce travel time between attractions?">
+                                Reduce travel time
+                            </button>
+                            <button class="prompt-chip btn btn-sm btn-outline-secondary rounded-pill" type="button" data-prompt="What should I change if it rains during my trip?">
+                                Rain alternatives
+                            </button>
+                            <button class="prompt-chip btn btn-sm btn-outline-secondary rounded-pill" type="button" data-prompt="How do I keep my trip within budget?">
+                                Stay within budget
+                            </button>
+                            <button class="prompt-chip btn btn-sm btn-outline-secondary rounded-pill" type="button" data-prompt="Why did SmartTrip recommend these attractions?">
+                                Explain recommendations
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top">
+                        <p class="muted small mb-0">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            LLM responses leverage local Ollama or OpenAI if configured. When offline or unconfigured, SmartTrip automatically uses the deterministic rule-based local assistant so planning never fails.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('[data-prompt]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const input = document.getElementById('question');
+            if (input) {
+                input.value = button.dataset.prompt;
+                input.focus();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,269 @@
+{% extends "travel/base.html" %}
+{% block title %}Admin Analytics | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section pt-5">
+  <div class="container-xl">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+      <div>
+        <span class="badge text-bg-primary rounded-pill px-3 py-2 mb-2">
+          <i class="fa-solid fa-shield-halved me-1"></i>Staff Administration
+        </span>
+        <h1 class="section-title mb-1">SmartTrip Platform Analytics</h1>
+        <p class="muted mb-0">Live platform metrics, user engagement, destination popularities, community reviews, and AI feedback.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary rounded-pill">
+          <i class="fa-solid fa-arrow-left me-1"></i>User Dashboard
+        </a>
+        <a href="/admin/" class="btn btn-dark rounded-pill" target="_blank">
+          <i class="fa-solid fa-lock me-1"></i>Django Admin
+        </a>
+      </div>
+    </div>
+
+    <!-- Key Platform Metrics -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-card metric-indigo h-100">
+          <small class="text-muted d-block"><i class="fa-regular fa-user me-1"></i>Total Users</small>
+          <div class="metric-number">{{ users }}</div>
+          <small class="text-muted">{{ verified_users }} email-verified</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-card metric-teal h-100">
+          <small class="text-muted d-block"><i class="fa-solid fa-envelope-circle-check me-1"></i>Verified</small>
+          <div class="metric-number">{{ verified_users }}</div>
+          <small class="text-muted">OTP confirmed</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-card metric-green h-100">
+          <small class="text-muted d-block"><i class="fa-solid fa-map-location-dot me-1"></i>Destinations</small>
+          <div class="metric-number">{{ destinations }}</div>
+          <small class="text-muted">In catalog</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-card metric-coral h-100">
+          <small class="text-muted d-block"><i class="fa-solid fa-route me-1"></i>Trips Created</small>
+          <div class="metric-number">{{ trips }}</div>
+          <small class="text-muted">Itineraries generated</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-card metric-purple h-100">
+          <small class="text-muted d-block"><i class="fa-regular fa-comments me-1"></i>Guest Reviews</small>
+          <div class="metric-number">{{ reviews }}</div>
+          <small class="text-muted">Community ratings</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-card h-100 border-warning">
+          <small class="text-muted d-block"><i class="fa-solid fa-star text-warning me-1"></i>Average Rating</small>
+          <div class="metric-number text-warning">{{ avg_rating|floatformat:1 }}<span class="fs-6 text-muted">/5</span></div>
+          <small class="text-muted">Across all reviews</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secondary Itinerary & Collaboration Intelligence -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+          <small class="text-muted d-block"><i class="fa-regular fa-calendar-days text-primary me-1"></i>Avg Duration</small>
+          <h4 class="fw-bold mb-0 mt-1">{{ avg_trip_days }} <span class="fs-6 text-muted fw-normal">days</span></h4>
+          <small class="text-muted">Per planned trip</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+          <small class="text-muted d-block"><i class="fa-solid fa-coins text-warning me-1"></i>Avg Budget</small>
+          <h4 class="fw-bold mb-0 mt-1">₹{{ avg_trip_budget }}</h4>
+          <small class="text-muted">Target per trip</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+          <small class="text-muted d-block"><i class="fa-solid fa-location-dot text-info me-1"></i>Scheduled Stops</small>
+          <h4 class="fw-bold mb-0 mt-1">{{ total_itinerary_items }}</h4>
+          <small class="text-muted">Across all itineraries</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+          <small class="text-muted d-block"><i class="fa-solid fa-users text-success me-1"></i>Group Trips</small>
+          <h4 class="fw-bold mb-0 mt-1">{{ group_trips_count }}</h4>
+          <small class="text-muted">Active group plans</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+          <small class="text-muted d-block"><i class="fa-solid fa-user-group text-danger me-1"></i>Collaborators</small>
+          <h4 class="fw-bold mb-0 mt-1">{{ group_collaborators_count }}</h4>
+          <small class="text-muted">Group trip participants</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+          <small class="text-muted d-block"><i class="fa-solid fa-receipt text-primary me-1"></i>Tracked Spend</small>
+          <h4 class="fw-bold mb-0 mt-1">₹{{ total_tracked_expenses }}</h4>
+          <small class="text-muted">In recorded expenses</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Detail Sections -->
+    <div class="row g-4 mb-4">
+      <!-- 1. Popular Destinations -->
+      <div class="col-lg-6">
+        <div class="section-card h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <span class="eyebrow">Trip Planning</span>
+              <h3 class="h5 fw-bold mb-0">Most Popular Destinations</h3>
+            </div>
+            <span class="badge text-bg-light border text-dark">Top 5</span>
+          </div>
+          <p class="small muted mb-3">Destinations with the highest number of planned itineraries.</p>
+
+          <div class="list-group list-group-flush">
+            {% for d in popular %}
+              <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge rounded-circle text-bg-light border text-dark" style="width:28px; height:28px; line-height:18px;">
+                    {{ forloop.counter }}
+                  </span>
+                  <div>
+                    <a href="{% url 'destination_detail' d.pk %}" class="fw-semibold text-dark text-decoration-none">
+                      {{ d.name }}
+                    </a>
+                    <small class="muted d-block">{{ d.state }}</small>
+                  </div>
+                </div>
+                <div class="text-end">
+                  <span class="badge text-bg-primary rounded-pill px-3 py-2">
+                    <i class="fa-solid fa-suitcase-rolling me-1"></i>{{ d.trip_count }} trip{{ d.trip_count|pluralize }}
+                  </span>
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-center py-4 text-muted">
+                <i class="fa-regular fa-compass fa-2x mb-2 d-block"></i>
+                <p class="mb-0">No trip plans recorded yet.</p>
+                <small>As users plan itineraries, top destinations will be ranked here.</small>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Most Reviewed Destinations -->
+      <div class="col-lg-6">
+        <div class="section-card h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <span class="eyebrow">Community Engagement</span>
+              <h3 class="h5 fw-bold mb-0">Most-Reviewed Destinations</h3>
+            </div>
+            <span class="badge text-bg-light border text-dark">Top 5</span>
+          </div>
+          <p class="small muted mb-3">Destinations with the most guest reviews and community feedback.</p>
+
+          <div class="list-group list-group-flush">
+            {% for d in top_reviewed %}
+              <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge rounded-circle text-bg-light border text-dark" style="width:28px; height:28px; line-height:18px;">
+                    {{ forloop.counter }}
+                  </span>
+                  <div>
+                    <a href="{% url 'destination_detail' d.pk %}" class="fw-semibold text-dark text-decoration-none">
+                      {{ d.name }}
+                    </a>
+                    <small class="muted d-block">{{ d.state }}</small>
+                  </div>
+                </div>
+                <div class="text-end">
+                  <span class="badge text-bg-secondary rounded-pill px-2 py-1 me-1">
+                    {{ d.review_count }} review{{ d.review_count|pluralize }}
+                  </span>
+                  <span class="badge text-bg-warning rounded-pill px-2 py-1">
+                    <i class="fa-solid fa-star me-1"></i>{{ d.avg_user_rating|floatformat:1 }}/5
+                  </span>
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-center py-4 text-muted">
+                <i class="fa-regular fa-comments fa-2x mb-2 d-block"></i>
+                <p class="mb-0">No destination reviews recorded yet.</p>
+                <small>Guest reviews and ratings will be aggregated here.</small>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Recommendation Feedback Statistics -->
+    <div class="row g-4">
+      <div class="col-12">
+        <div class="section-card">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <div>
+              <span class="eyebrow">AI Optimization</span>
+              <h3 class="h5 fw-bold mb-0">Recommendation Feedback Statistics</h3>
+            </div>
+            <span class="chip chip-purple">
+              <i class="fa-solid fa-chart-pie me-1"></i>{{ total_feedback }} total feedback actions
+            </span>
+          </div>
+          <p class="small muted mb-4">
+            User interactions on recommended itinerary attractions (like, dislike, save, skip) directly inform the incremental preference learning engine.
+          </p>
+
+          {% if feedback %}
+            <div class="row g-3">
+              {% for f in feedback %}
+                <div class="col-md-6 col-lg-3">
+                  <div class="p-3 rounded-4 bg-body-tertiary h-100 border">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <strong class="fs-6">
+                        {% if f.action == "like" %}
+                          <i class="fa-solid fa-thumbs-up text-success me-1"></i>Liked
+                        {% elif f.action == "dislike" %}
+                          <i class="fa-solid fa-thumbs-down text-danger me-1"></i>Disliked
+                        {% elif f.action == "save" %}
+                          <i class="fa-solid fa-bookmark text-primary me-1"></i>Saved
+                        {% else %}
+                          <i class="fa-solid fa-forward text-secondary me-1"></i>Skipped
+                        {% endif %}
+                      </strong>
+                      <span class="badge text-bg-dark rounded-pill">{{ f.count }}</span>
+                    </div>
+                    <div class="progress mb-2" style="height: 8px;">
+                      <div class="progress-bar {% if f.action == 'like' %}bg-success{% elif f.action == 'dislike' %}bg-danger{% elif f.action == 'save' %}bg-primary{% else %}bg-secondary{% endif %}"
+                           style="width: {{ f.pct }}%;"
+                           aria-valuenow="{{ f.pct }}" aria-valuemin="0" aria-valuemax="100">
+                      </div>
+                    </div>
+                    <small class="muted">{{ f.pct }}% of all recorded feedback</small>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center py-4 text-muted">
+              <i class="fa-solid fa-thumbs-up fa-2x mb-2 d-block"></i>
+              <p class="mb-0">No recommendation feedback recorded yet.</p>
+              <small class="text-muted">User likes and dislikes on attractions will provide real-time model tuning analytics here.</small>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

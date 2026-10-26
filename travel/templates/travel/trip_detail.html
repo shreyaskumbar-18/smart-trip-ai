@@ -1,167 +1,472 @@
 {% extends "travel/base.html" %}
+{% load static %}
 
 {% block title %}{{ trip.title }} | SmartTrip AI{% endblock %}
 
+{% block extra_css %}
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+>
+{% endblock %}
+
 {% block content %}
-<div class="container py-5">
+<section class="section pt-5">
+    <div class="container-xl">
 
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
-        <div>
-            <span class="badge text-bg-light">{{ trip.destination.name }}</span>
-            <h1 class="mt-2">{{ trip.title }}</h1>
-            <p class="text-muted mb-0">
-                {{ trip.start_date }} to {{ trip.end_date }}
-                · {{ trip.travelers }} traveler(s)
-                · {{ trip.get_pace_display }}
-            </p>
-        </div>
-
-        <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-dark" href="{% url 'budget' trip.pk %}">Budget</a>
-            <a class="btn btn-outline-dark" href="{% url 'what_if' trip.pk %}">What-if</a>
-            <a class="btn btn-outline-dark" href="{% url 'group' trip.pk %}">Group</a>
-            <a class="btn btn-outline-dark" href="{% url 'assistant' trip.pk %}">Assistant</a>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="stat">
-                <span>Quality</span>
-                <strong>{{ quality }}</strong>
-                <small class="text-muted">/ 100</small>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="stat">
-                <span>Sustainability</span>
-                <strong>{{ sustainability }}</strong>
-                <small class="text-muted">/ 100</small>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="stat">
-                <span>Estimated</span>
-                <strong>₹{{ trip.estimated_total }}</strong>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="stat">
-                <span>Feasibility</span>
-                <strong>
-                    {% if feasibility.feasible %}
-                        Feasible
-                    {% else %}
-                        Review
-                    {% endif %}
-                </strong>
-            </div>
-        </div>
-    </div>
-
-    {% if feasibility.issues %}
-        <div class="alert alert-warning">
-            <strong>Feasibility review</strong>
-            {% for issue in feasibility.issues %}
-                <div>{{ issue }}</div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="alert alert-success">
-            Your current itinerary passes the feasibility checks.
-        </div>
-    {% endif %}
-
-    {% for group in groups %}
-        <section class="day-section mb-4">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <!-- Trip overview -->
+        <div class="trip-hero mb-4">
+            <div class="d-flex flex-wrap justify-content-between gap-3 align-items-end">
                 <div>
-                    <h3 class="mb-1">Day {{ group.number }}</h3>
-                    <span class="text-muted">
-                        Weather: <strong>{{ group.weather.condition }}</strong>
-                        · {{ group.weather.advice }}
+                    <span class="chip chip-teal">
+                        {{ trip.destination.name }}
                     </span>
+
+                    <h1 class="section-title mt-3 mb-2">
+                        {{ trip.title }}
+                    </h1>
+
+                    <p class="text-white-50 mb-0">
+                        {{ trip.start_date }} to {{ trip.end_date }}
+                        · {{ trip.travelers }} traveller(s)
+                        · {{ trip.pace|title }} pace
+                    </p>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-light rounded-pill"
+                       href="{% url 'export_trip_pdf' trip.pk %}">
+                        <i class="fa-regular fa-file-pdf me-1"></i> PDF
+                    </a>
+
+                    <a class="btn btn-outline-light rounded-pill"
+                       href="{% url 'budget' trip.pk %}">
+                        Budget
+                    </a>
+
+                    <a class="btn btn-outline-light rounded-pill"
+                       href="{% url 'what_if' trip.pk %}">
+                        What-if
+                    </a>
+
+                    <a class="btn btn-primary rounded-pill"
+                       href="{% url 'trip_copilot_detail' trip.pk %}">
+                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Copilot
+                    </a>
+
+                    <a class="btn btn-outline-light rounded-pill"
+                       href="{% url 'decision_lab' trip.pk %}">
+                        <i class="fa-solid fa-flask-vial me-1"></i> Decision Lab
+                    </a>
+
+                    <a class="btn btn-outline-light rounded-pill"
+                       href="{% url 'assistant_trip' trip.pk %}">
+                        <i class="fa-solid fa-sparkles me-1"></i> Assistant
+                    </a>
+
+                    <a class="btn btn-outline-light rounded-pill"
+                       href="{% url 'group' trip.pk %}">
+                        <i class="fa-solid fa-users me-1"></i> Collaborate
+                    </a>
+
+                    {% if saved %}
+                        <form method="post" action="{% url 'remove_saved_trip' trip.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-light rounded-pill">Unsave</button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{% url 'save_trip' trip.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary rounded-pill">Save trip</button>
+                        </form>
+                    {% endif %}
                 </div>
             </div>
+        </div>
 
-            {% for item in group.items %}
-                <div class="itinerary-item mb-3">
-                    <div class="time">{{ item.start_time|time:"H:i" }}</div>
+        <!-- Advanced planning -->
+        <div class="section-card mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <span class="eyebrow">Advanced planning</span>
+                    <h2 class="h5 fw-bold mb-1">
+                        Compare optimized plans with Decision Lab
+                    </h2>
+                    <p class="muted small mb-0">
+                        Explore your itinerary's preference match, cost, distance and sustainability using NSGA-II multi-objective optimization and 0/1 Knapsack selection.
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'decision_lab' trip.pk %}" class="btn btn-primary rounded-pill px-3">
+                        <i class="fa-solid fa-flask-vial me-2"></i>Open Decision Lab
+                    </a>
+                </div>
+            </div>
+        </div>
 
-                    <div class="flex-grow-1">
-                        <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <h5 class="mb-0">{{ item.attraction.name }}</h5>
-                            <span class="badge text-bg-light">
-                                {{ item.attraction.category }}
-                            </span>
-                            <span class="badge text-bg-light">
-                                Score {{ item.score|floatformat:1 }}
-                            </span>
-                        </div>
+        <!-- Trip metrics -->
+        <div class="row g-3 mb-4">
 
-                        <p class="mt-2 mb-1">
-                            {{ item.attraction.description }}
-                        </p>
-
-                        <small class="text-muted">
-                            {{ item.reason }}
-                        </small>
-
-                        {% if item.weather_alternative %}
-                            <div class="mt-3 p-2 rounded bg-light">
-                                <strong>Weather alternative:</strong>
-                                {{ item.weather_alternative.name }}
-                                <span class="text-muted">
-                                    if the planned activity becomes unsuitable.
-                                </span>
-                            </div>
-                        {% endif %}
-
-                        <div class="mt-3 d-flex gap-2">
-                            <a class="btn btn-sm btn-outline-success"
-                               href="{% url 'feedback' trip.pk item.pk 'like' %}">
-                                Like
-                            </a>
-
-                            <a class="btn btn-sm btn-outline-danger"
-                               href="{% url 'feedback' trip.pk item.pk 'dislike' %}">
-                                Dislike
-                            </a>
-                        </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card metric-indigo">
+                    <small>Trip quality</small>
+                    <div class="metric-number">
+                        {{ quality }}<span>/100</span>
                     </div>
                 </div>
-            {% empty %}
-                <div class="alert alert-light">
-                    No activities are scheduled for this day.
+            </div>
+
+            <div class="col-6 col-lg-3">
+                <div class="metric-card metric-teal">
+                    <small>Sustainability</small>
+                    <div class="metric-number">
+                        {{ sustainability }}<span>/100</span>
+                    </div>
                 </div>
-            {% endfor %}
-        </section>
-    {% endfor %}
+            </div>
 
-    <div class="d-flex flex-wrap gap-2 mt-4">
-        <form method="post" action="{% url 'replan' trip.pk %}">
-            {% csrf_token %}
-            <input type="hidden" name="trigger" value="Weather change">
-            <button class="btn btn-warning">
-                Prepare Dynamic Re-plan
-            </button>
-        </form>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card metric-coral">
+                    <small>Estimated cost</small>
+                    <div class="metric-number">
+                        ₹{{ trip.estimated_total }}
+                    </div>
+                </div>
+            </div>
 
-        {% if saved %}
-            <span class="btn btn-success disabled">Trip Saved</span>
-        {% else %}
-            <a class="btn btn-primary" href="{% url 'save_trip' trip.pk %}">
-                Save Trip
-            </a>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card {% if feasibility.feasible %}metric-green{% else %}metric-amber{% endif %}">
+                    <small>Feasibility</small>
+
+                    <div class="metric-number fs-4">
+                        {% if feasibility.feasible %}
+                            Ready
+                        {% else %}
+                            Review
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Feasibility warnings -->
+        {% if not feasibility.feasible %}
+            <div class="alert alert-warning rounded-4">
+                <strong>
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                    Feasibility review
+                </strong>
+
+                {% for issue in feasibility.issues %}
+                    <div>{{ issue }}</div>
+                {% endfor %}
+            </div>
         {% endif %}
 
-        <a class="btn btn-outline-dark" href="{% url 'budget' trip.pk %}">
-            Manage Budget
-        </a>
-    </div>
+        <!-- Route map and weather -->
+        <div class="row g-4 mb-4">
 
-</div>
+            <div class="col-lg-7">
+                <div class="section-card h-100">
+
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                        <div>
+                            <span class="eyebrow">Your route</span>
+
+                            <h2 class="h4 fw-bold mb-1">
+                                Stops in itinerary order
+                            </h2>
+
+                            <p class="muted small mb-0">
+                                Select a numbered pin to view each attraction.
+                            </p>
+                        </div>
+
+                        <span class="chip">
+                            {{ route_points|length }} mapped stops
+                        </span>
+                    </div>
+
+                    <div
+                        id="tripRouteMap"
+                        class="trip-route-map"
+                        role="region"
+                        aria-label="Interactive map showing itinerary stops"
+                    ></div>
+
+                    <div id="mapTileNotice" class="small text-muted mt-2" role="status" aria-live="polite" hidden></div>
+
+                    <div id="routeSummary" class="route-summary mt-3">
+                        Route estimates load when the routing service is available.
+                    </div>
+
+                    {{ route_points|json_script:"route-points-data" }}
+                    {{ map_config|json_script:"map-config-data" }}
+
+                </div>
+            </div>
+
+            <!-- Weather outlook -->
+            <div class="col-lg-5">
+                <div class="section-card h-100">
+
+                    <span class="eyebrow">Weather outlook</span>
+
+                    <h2 class="h4 fw-bold mb-3">
+                        Conditions for your trip
+                    </h2>
+
+                    {% for day in groups %}
+                        <div class="weather-row">
+
+                            <div class="weather-icon {% if day.weather.condition == 'Rain' or day.weather.condition == 'Thunderstorm' %}weather-rain{% elif day.weather.condition == 'Clear' %}weather-sun{% else %}weather-cloud{% endif %}">
+
+                                {% if day.weather.condition == 'Rain' or day.weather.condition == 'Thunderstorm' %}
+                                    <i class="fa-solid fa-cloud-rain"></i>
+                                {% elif day.weather.condition == 'Clear' %}
+                                    <i class="fa-solid fa-sun"></i>
+                                {% else %}
+                                    <i class="fa-solid fa-cloud"></i>
+                                {% endif %}
+
+                            </div>
+
+                            <div class="flex-grow-1">
+
+                                <div class="d-flex justify-content-between gap-2">
+                                    <strong>
+                                        Day {{ day.number }}
+                                        · {{ day.weather.condition }}
+                                    </strong>
+
+                                    <span class="small muted">
+                                        {{ day.weather.source }}
+                                    </span>
+                                </div>
+
+                                <div class="small muted">
+                                    {{ day.weather.advice }}
+                                </div>
+
+                                <div class="weather-stats">
+
+                                    {% if day.weather.temperature != None %}
+                                        <span>
+                                            <i class="fa-solid fa-temperature-half me-1"></i>
+                                            {{ day.weather.temperature }}°C now
+                                        </span>
+                                    {% endif %}
+
+                                    {% if day.weather.high != None %}
+                                        <span>
+                                            {{ day.weather.low }}° /
+                                            {{ day.weather.high }}°C
+                                        </span>
+                                    {% endif %}
+
+                                    {% if day.weather.rain_probability != None %}
+                                        <span>
+                                            <i class="fa-solid fa-droplet me-1"></i>
+                                            {{ day.weather.rain_probability }}% rain
+                                        </span>
+                                    {% endif %}
+
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+
+                    <div class="small muted mt-3">
+                        Live forecasts are available only when the weather
+                        service responds and the date falls within its
+                        forecast window. Offline demo conditions are labelled.
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Day-by-day itinerary -->
+        {% for day in groups %}
+            <div class="day-section">
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+
+                    <div>
+                        <span class="eyebrow">
+                            Day {{ day.number }}
+                        </span>
+
+                        <h3 class="fw-bold mb-0">
+                            Your day plan
+                        </h3>
+
+                        <small class="muted">
+                            {{ day.weather.target_date }}
+                        </small>
+                    </div>
+
+                    <form method="post" action="{% url 'replan' trip.pk %}">
+                        {% csrf_token %}
+
+                        <input
+                            type="hidden"
+                            name="trigger"
+                            value="Weather-aware replan"
+                        >
+
+                        <button
+                            type="submit"
+                            class="btn btn-outline-primary rounded-pill"
+                        >
+                            <i class="fa-solid fa-arrows-rotate me-1"></i>
+                            Repair itinerary
+                        </button>
+                    </form>
+
+                </div>
+
+                {% for item in day.items %}
+                    <div class="itinerary-item" data-itinerary-item="{{ item.pk }}" data-previous-item-id="{{ item.previous_item_id }}">
+
+                        <div class="time">
+                            {{ item.start_time|time:"H:i" }}
+                        </div>
+
+                        <div class="flex-grow-1">
+
+                            <div class="row g-3 align-items-start">
+                                <div class="col-12 col-lg-8">
+
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+
+                                <h5 class="mb-1">
+                                    {{ item.attraction.name }}
+                                </h5>
+
+                                <span class="chip chip-purple">
+                                    {{ item.score|floatformat:1 }} match
+                                </span>
+
+                            </div>
+
+                            <div class="muted small">
+                                {{ item.attraction.category|title }}
+                                · ₹{{ item.attraction.estimated_cost }}
+                                · {{ item.attraction.duration_hours }}h
+                            </div>
+
+                            <p class="small mt-2 mb-2">
+                                {{ item.reason }}
+                            </p>
+
+                            <div class="d-flex gap-2 flex-wrap">
+
+                                <form method="post" action="{% url 'feedback' trip.pk item.pk 'like' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-success rounded-pill">
+                                        <i class="fa-regular fa-thumbs-up me-1"></i>
+                                        Like
+                                    </button>
+                                </form>
+
+                                <form method="post" action="{% url 'feedback' trip.pk item.pk 'dislike' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill">
+                                        <i class="fa-regular fa-thumbs-down me-1"></i>
+                                        Not for me
+                                    </button>
+                                </form>
+
+                            </div>
+
+                            {% if item.weather_alternative %}
+                                <div class="alternative-note mt-3">
+                                    <i class="fa-solid fa-cloud-sun me-2"></i>
+
+                                    <strong>Alternative:</strong>
+                                    {{ item.weather_alternative.name }}
+                                </div>
+                            {% endif %}
+
+                                </div>
+                                <div class="col-12 col-lg-4">
+                                    {% if item.has_map_coordinates %}
+                                        <div class="itinerary-map-preview"
+                                             data-map-preview
+                                             data-lat="{{ item.map_latitude }}"
+                                             data-lon="{{ item.map_longitude }}"
+                                             aria-label="Map preview for {{ item.attraction.name }}"></div>
+                                        <a class="btn btn-sm btn-outline-primary rounded-pill mt-2"
+                                           href="#tripRouteMap"
+                                           data-focus-map-point="{{ item.pk }}">
+                                            <i class="fa-solid fa-up-right-from-square me-1"></i>View on route map
+                                        </a>
+                                    {% else %}
+                                        <div class="itinerary-map-preview map-preview-unavailable" role="status">
+                                            Location map unavailable: coordinates are missing.
+                                        </div>
+                                    {% endif %}
+
+                                    <div class="itinerary-distance small mt-2">
+                                        {% if item.distance_from_previous_km != None %}
+                                            <span>Straight-line from previous stop: {{ item.distance_from_previous_km|floatformat:1 }} km</span>
+                                        {% elif item.previous_item_id %}
+                                            <span class="text-muted">Straight-line distance unavailable: coordinates are missing for this stop or the previous stop.</span>
+                                        {% else %}
+                                            <span class="text-muted">First stop of the day; no previous-stop distance.</span>
+                                        {% endif %}
+                                        <span class="road-distance d-block mt-1" data-road-distance-for="{{ item.pk }}" hidden></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                {% empty %}
+                    <p class="muted mb-0">
+                        No activities scheduled for this day.
+                    </p>
+                {% endfor %}
+
+            </div>
+        {% endfor %}
+
+        <!-- Final actions -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
+
+            <form method="post" action="{% url 'delete_trip' trip.pk %}" onsubmit="return confirm('Are you sure you want to delete this trip permanently?');" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger rounded-pill">
+                    <i class="fa-solid fa-trash me-1"></i>Delete trip
+                </button>
+            </form>
+
+            <a
+                class="btn btn-primary rounded-pill px-4"
+                href="{% url 'assistant_trip' trip.pk %}"
+            >
+                <i class="fa-solid fa-wand-magic-sparkles me-2"></i>
+                Ask AI about this trip
+            </a>
+
+        </div>
+
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+></script>
+
+<script src="{% static 'travel/js/trip-map.js' %}"></script>
 {% endblock %}

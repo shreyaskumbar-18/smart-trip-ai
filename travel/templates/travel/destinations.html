@@ -1,1 +1,174 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><h1>Destinations</h1><form class="row g-2 my-4"><div class="col-md-8"><input class="form-control" name="q" value="{{q}}" placeholder="Search"></div><div class="col-md-2"><input class="form-control" name="interest" value="{{interest}}" placeholder="Interest"></div><div class="col-md-2"><button class="btn btn-dark w-100">Search</button></div></form><div class="row g-4">{% for d in destinations %}<div class="col-md-6 col-lg-4"><div class="card destination-card h-100"><img src="{{d.image_url}}" class="card-img-top"><div class="card-body"><h4>{{d.name}}</h4><p>{{d.description}}</p><div class="small text-muted">★ {{d.rating}} · Sustainability {{d.sustainability_score}} · Hidden gem {{d.hidden_gem_score}}</div><a class="btn btn-outline-dark mt-3" href="{% url 'destination_detail' d.pk %}">Details</a></div></div></div>{% empty %}<p>No results.</p>{% endfor %}</div></div>{% endblock %}
+
+{% extends "travel/base.html" %}
+{% load static %}
+
+{% block title %}Explore destinations | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section pt-5">
+    <div class="container-xl">
+
+        <!-- Page heading -->
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div>
+                <div class="eyebrow">Explore</div>
+                <h1 class="section-title mb-1">Find your next destination</h1>
+                <p class="muted mb-0">
+                    Search, filter and compare destinations.
+                </p>
+            </div>
+
+            <a href="{% url 'compare_destinations' %}"
+               class="btn btn-dark rounded-pill">
+                Compare destinations
+            </a>
+        </div>
+
+        <!-- Search and filters -->
+        <form class="metric-card mb-4" method="get">
+            <div class="row g-2 align-items-end">
+
+                <div class="col-lg-6">
+                    <label class="form-label" for="destination-search">
+                        Search
+                    </label>
+                    <input
+                        id="destination-search"
+                        class="form-control"
+                        type="text"
+                        name="q"
+                        value="{{ q|default:'' }}"
+                        placeholder="Goa, Karnataka, nature..."
+                    >
+                </div>
+
+                <div class="col-md-3 col-lg-2">
+                    <label class="form-label" for="destination-interest">
+                        Interest
+                    </label>
+                    <select
+                        id="destination-interest"
+                        class="form-select"
+                        name="interest"
+                    >
+                        <option value="" {% if not interest %}selected{% endif %}>All</option>
+                        <option value="culture" {% if interest == "culture" %}selected{% endif %}>Culture</option>
+                        <option value="nature" {% if interest == "nature" %}selected{% endif %}>Nature</option>
+                        <option value="adventure" {% if interest == "adventure" %}selected{% endif %}>Adventure</option>
+                        <option value="food" {% if interest == "food" %}selected{% endif %}>Food</option>
+                        <option value="history" {% if interest == "history" %}selected{% endif %}>History</option>
+                        <option value="shopping" {% if interest == "shopping" %}selected{% endif %}>Shopping</option>
+                        <option value="relaxation" {% if interest == "relaxation" %}selected{% endif %}>Relaxation</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 col-lg-2">
+                    <label class="form-label" for="destination-rating">
+                        Rating
+                    </label>
+                    <select
+                        id="destination-rating"
+                        class="form-select"
+                        name="rating"
+                    >
+                        <option value="" {% if not rating %}selected{% endif %}>Any</option>
+                        <option value="4" {% if rating == "4" %}selected{% endif %}>4+</option>
+                        <option value="4.5" {% if rating == "4.5" %}selected{% endif %}>4.5+</option>
+                    </select>
+                </div>
+
+                <div class="col-lg-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="fa-solid fa-magnifying-glass me-1"></i>Search
+                    </button>
+                    {% if q or interest or rating %}
+                        <a href="{% url 'destinations' %}" class="btn btn-outline-secondary" title="Clear search & filters">
+                            <i class="fa-solid fa-xmark"></i>
+                        </a>
+                    {% endif %}
+                </div>
+
+            </div>
+        </form>
+
+        <!-- Destination cards -->
+        <div class="row g-4">
+
+            {% for d in destinations %}
+                <div class="col-md-6 col-lg-4">
+
+                    <div class="travel-card h-100">
+
+                        <!-- Destination image -->
+                        {% with destination_name=d.name|lower %}
+                            {% if "mysuru" in destination_name or "mysore" in destination_name %}
+                                <img
+                                    src="{% static 'travel/images/mysuru-palace.jpg' %}"
+                                    alt="Mysore Palace in Mysuru, Karnataka"
+                                    loading="eager"
+                                    decoding="async"
+                                    style="display:block; width:100%; height:210px; object-fit:cover;"
+                                >
+                            {% else %}
+                                <img
+                                    src="{{ d.image_url|default:'' }}"
+                                    alt="{{ d.name }}"
+                                    loading="lazy"
+                                    decoding="async"
+                                    style="display:block; width:100%; height:210px; object-fit:cover;"
+                                    onerror="this.onerror=null; this.src='https://placehold.co/800x500/eaf2f5/24445c?text=Explore+destination';"
+                                >
+                            {% endif %}
+                        {% endwith %}
+
+                        <!-- Destination information -->
+                        <div class="card-body">
+
+                            <div class="d-flex justify-content-between align-items-center gap-2">
+                                <span class="chip">{{ d.state }}</span>
+                                <span class="rating">★ {{ d.rating }}</span>
+                            </div>
+
+                            <h4 class="mt-3">{{ d.name }}</h4>
+
+                            <p class="muted">
+                                {{ d.description|truncatewords:20 }}
+                            </p>
+
+                            <div class="small muted mb-3">
+                                Sustainability {{ d.sustainability_score }}
+                                · Hidden gem {{ d.hidden_gem_score }}
+                            </div>
+
+                            <a
+                                class="btn btn-dark rounded-pill"
+                                href="{% url 'destination_detail' d.pk %}"
+                            >
+                                View destination
+                            </a>
+
+                        </div>
+                    </div>
+
+                </div>
+
+            {% empty %}
+                <div class="col-12">
+                    <div class="metric-card text-center py-5">
+                        <div class="display-6 text-muted mb-3"><i class="fa-solid fa-compass"></i></div>
+                        <h5>No destinations found</h5>
+                        <p class="muted mb-3">
+                            Try changing your search terms or clearing the selected filters.
+                        </p>
+                        <a href="{% url 'destinations' %}" class="btn btn-outline-primary rounded-pill px-4">
+                            Reset filters
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+
+        </div>
+
+    </div>
+</section>
+{% endblock %}

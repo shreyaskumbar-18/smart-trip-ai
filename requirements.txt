@@ -1,2 +1,4 @@
-Django>=5.2,<7.0
+Django>=5.2,<5.3
 Pillow>=10.0
+reportlab>=4.0
+PyMySQL>=1.1

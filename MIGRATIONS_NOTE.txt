@@ -1,10 +1,12 @@
-The current project includes the initial Django migration.
+SmartTrip AI database note
 
-For a fresh setup:
-1. Activate the virtual environment.
-2. Run: python manage.py migrate
-3. Run: python manage.py seed_data
+The project uses one canonical Django database configuration. MySQL is the default and DB_NAME defaults to smarttrip. The package does not include a local database file or private data dump.
 
-If you change database models later, run:
-python manage.py makemigrations
+The Django migration files define the schema, including email verification, learned preferences, OTP verification, reviews, ratings, trip optimization and group planning.
+
+Before applying migrations to an existing database, back up the database and inspect its migration history. Then run:
+
 python manage.py migrate
+python manage.py seed_data
+
+The seed_data command loads the demonstration destinations and attractions. Set DB_ENGINE=sqlite in .env only if you want a separate local SQLite development database.

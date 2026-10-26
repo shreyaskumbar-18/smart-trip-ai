@@ -1,3 +1,244 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="d-flex justify-content-between align-items-center"><div><h1>Dashboard</h1><p class="text-muted">Welcome, {{user.username}}.</p></div><a href="{% url 'trip_planner' %}" class="btn btn-primary">+ New Trip</a></div>
-<div class="row g-3 my-4"><div class="col-md-4"><div class="stat"><span>Trips</span><strong>{{trip_count}}</strong></div></div><div class="col-md-4"><div class="stat"><span>Saved</span><strong>{{saved_count}}</strong></div></div><div class="col-md-4"><div class="stat"><span>Learned interests</span><strong>{{learned|join:", "}}</strong></div></div></div>
-<h3>Recent trips</h3><div class="row g-3 mt-1">{% for t in trips %}<div class="col-md-6 col-lg-4"><div class="feature-card h-100"><span class="badge text-bg-light">{{t.destination.name}}</span><h5 class="mt-2">{{t.title}}</h5><p>{{t.start_date}} to {{t.end_date}}</p><a href="{% url 'trip_detail' t.pk %}" class="btn btn-dark btn-sm">Open</a></div></div>{% empty %}<p>No trips yet.</p>{% endfor %}</div></div>{% endblock %}
+{% extends "travel/base.html" %}
+{% block title %}My Trips & Workspace | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section pt-5 pb-5">
+  <div class="container-xl">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+      <div>
+        <span class="badge text-bg-primary rounded-pill px-3 py-2 mb-2">
+          <i class="fa-regular fa-compass me-1"></i>Traveler Workspace
+        </span>
+        <h1 class="section-title mb-1">Welcome back, {{ user.first_name|default:user.username }}</h1>
+        <p class="muted mb-0">Manage your personalized itineraries, group collaborations, and preference learning profile.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'join_group_trip' %}" class="btn btn-outline-primary rounded-pill px-3">
+          <i class="fa-solid fa-ticket me-1"></i>Join with Invite Code
+        </a>
+        <a href="{% url 'trip_copilot' %}" class="btn btn-primary rounded-pill px-4 shadow-sm">
+          <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Copilot
+        </a>
+        <a href="{% url 'trip_planner' %}" class="btn btn-outline-dark rounded-pill px-3">
+          <i class="fa-solid fa-calendar-plus me-1"></i>Form Planner
+        </a>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+          <small class="text-muted d-block"><i class="fa-solid fa-route text-primary me-1"></i>Trips Created</small>
+          <h3 class="fw-bold mb-0 mt-1">{{ trip_count }}</h3>
+          <small class="text-muted">Personal itineraries</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+          <small class="text-muted d-block"><i class="fa-solid fa-users text-success me-1"></i>Collaborations</small>
+          <h3 class="fw-bold mb-0 mt-1">{{ joined_group_trips|length }}</h3>
+          <small class="text-muted">Shared group trips</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+          <small class="text-muted d-block"><i class="fa-regular fa-bookmark text-warning me-1"></i>Saved Trips</small>
+          <h3 class="fw-bold mb-0 mt-1">{{ saved_count }}</h3>
+          <small class="text-muted">Bookmarked itineraries</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+          <small class="text-muted d-block"><i class="fa-solid fa-brain text-info me-1"></i>Top Learned Style</small>
+          <h4 class="fw-bold mb-0 mt-1 text-truncate text-capitalize">
+            {% if learned %}{{ learned.0 }}{% else %}Adaptive{% endif %}
+          </h4>
+          <small class="text-muted">AI learned preference</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Workspace Grid -->
+    <div class="row g-4">
+      <!-- Left Column: Recent Trips & Joined Group Trips -->
+      <div class="col-lg-8">
+        <!-- Created Trips -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="fw-bold mb-0">Your Trips</h4>
+          <a href="{% url 'saved_trips' %}" class="small text-decoration-none">
+            <i class="fa-regular fa-bookmark me-1"></i>View Saved Trips
+          </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+          {% for t in trips %}
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+                <div class="card-body p-4 d-flex flex-column justify-content-between">
+                  <div>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <span class="badge text-bg-light border text-dark rounded-pill">
+                        <i class="fa-solid fa-map-pin text-primary me-1"></i>{{ t.destination.name }}
+                      </span>
+                      <span class="badge text-bg-primary rounded-pill px-2 py-1 small">
+                        {{ t.days }} Day{{ t.days|pluralize }}
+                      </span>
+                    </div>
+                    <h5 class="fw-bold mb-1 text-dark">{{ t.title }}</h5>
+                    <p class="small text-muted mb-3">
+                      <i class="fa-regular fa-calendar me-1"></i>{{ t.start_date }} &rarr; {{ t.end_date }} &middot; {{ t.travelers }} traveler{{ t.travelers|pluralize }}
+                    </p>
+                  </div>
+
+                  <div class="d-flex gap-2 pt-2 border-top">
+                    <a class="btn btn-dark btn-sm rounded-pill px-3 flex-grow-1" href="{% url 'trip_detail' t.pk %}">
+                      <i class="fa-solid fa-arrow-right me-1"></i>Open
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm rounded-pill px-3" href="{% url 'trip_copilot_detail' t.pk %}" title="Open AI Copilot">
+                      <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Copilot
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm rounded-pill px-2" href="{% url 'group' t.pk %}" title="Collaborate with friends">
+                      <i class="fa-solid fa-users"></i>
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm rounded-pill px-2" href="{% url 'budget' t.pk %}" title="Track trip budget">
+                      <i class="fa-solid fa-wallet"></i>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <div class="col-12">
+              <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">
+                <i class="fa-regular fa-compass fa-3x text-muted mb-3"></i>
+                <h5 class="fw-bold">No trips created yet</h5>
+                <p class="text-muted small">Generate your first AI itinerary with destinations, activities, and budget planning.</p>
+                <div>
+                  <a href="{% url 'trip_planner' %}" class="btn btn-primary rounded-pill px-4">
+                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Plan a Trip Now
+                  </a>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Joined Group Trips Section -->
+        {% if joined_group_trips %}
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0">Group Trips You've Joined</h4>
+            <span class="badge text-bg-success rounded-pill px-3 py-1">Collaborator</span>
+          </div>
+
+          <div class="row g-3">
+            {% for gt in joined_group_trips %}
+              <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100 border-start border-success border-4">
+                  <div class="card-body p-4 d-flex flex-column justify-content-between">
+                    <div>
+                      <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge text-bg-light border text-dark rounded-pill">
+                          <i class="fa-solid fa-map-pin text-success me-1"></i>{{ gt.destination.name }}
+                        </span>
+                        <span class="badge text-bg-success rounded-pill px-2 py-1 small">
+                          Host: {{ gt.user.username }}
+                        </span>
+                      </div>
+                      <h5 class="fw-bold mb-1 text-dark">{{ gt.title }}</h5>
+                      <p class="small text-muted mb-3">
+                        {{ gt.days }} Days &middot; {{ gt.travelers }} traveler{{ gt.travelers|pluralize }}
+                      </p>
+                    </div>
+
+                    <div class="d-flex gap-2 pt-2 border-top">
+                      <a class="btn btn-success btn-sm rounded-pill px-3 flex-grow-1" href="{% url 'group' gt.pk %}">
+                        <i class="fa-solid fa-users me-1"></i>Open Collaboration Hub
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Right Column: Preference Profile & Intelligence -->
+      <div class="col-lg-4">
+        <!-- Preference Intelligence Card -->
+        <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="badge text-bg-light border text-dark rounded-pill px-3 py-1">
+              <i class="fa-solid fa-brain me-1 text-primary"></i>AI Preference Engine
+            </span>
+          </div>
+          <h4 class="fw-bold mb-1">Learned Travel Profile</h4>
+          <p class="small muted mb-3">Continuously adapts from your reviews, saved trips, and attraction feedback.</p>
+
+          {% for name, value in preferences %}
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center small mb-1">
+                <span class="text-capitalize fw-semibold text-dark">{{ name }}</span>
+                <span class="badge text-bg-primary rounded-pill">{{ value|floatformat:2 }}</span>
+              </div>
+              <div class="progress" style="height: 8px;">
+                <div class="progress-bar bg-primary" role="progressbar"
+                     style="width: {% widthratio value 1 100 %}%;"
+                     aria-valuenow="{% widthratio value 1 100 %}" aria-valuemin="0" aria-valuemax="100">
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-muted small">Plan trips and interact with recommendations to teach SmartTrip your travel preferences.</p>
+          {% endfor %}
+
+          <div class="pt-3 border-top mt-2">
+            <a class="btn btn-outline-secondary btn-sm rounded-pill w-100" href="{% url 'profile' %}">
+              <i class="fa-regular fa-id-card me-1"></i>Manage Preferences
+            </a>
+          </div>
+        </div>
+
+        <!-- Quick AI Tools Card -->
+        <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+          <h5 class="fw-bold mb-3">AI Travel Intelligence</h5>
+          <div class="list-group list-group-flush">
+            <a href="{% url 'trip_copilot' %}" class="list-group-item list-group-item-action px-0 py-2 border-bottom d-flex align-items-center justify-content-between">
+              <div>
+                <strong class="text-dark small d-block"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>AI Trip Copilot</strong>
+                <small class="text-muted">Multi-alternative planning & conversational refinement</small>
+              </div>
+              <i class="fa-solid fa-chevron-right text-muted small"></i>
+            </a>
+            <a href="{% url 'recommendations' %}" class="list-group-item list-group-item-action px-0 py-2 border-bottom d-flex align-items-center justify-content-between">
+              <div>
+                <strong class="text-dark small d-block"><i class="fa-solid fa-compass text-primary me-2"></i>Smart Recommendations</strong>
+                <small class="text-muted">Personalized destination attraction rankings</small>
+              </div>
+              <i class="fa-solid fa-chevron-right text-muted small"></i>
+            </a>
+            <a href="{% url 'assistant' %}" class="list-group-item list-group-item-action px-0 py-2 border-bottom d-flex align-items-center justify-content-between">
+              <div>
+                <strong class="text-dark small d-block"><i class="fa-solid fa-wand-magic-sparkles text-info me-2"></i>AI Travel Assistant</strong>
+                <small class="text-muted">Context-aware natural language assistant</small>
+              </div>
+              <i class="fa-solid fa-chevron-right text-muted small"></i>
+            </a>
+            <a href="{% url 'compare_destinations' %}" class="list-group-item list-group-item-action px-0 py-2 border-0 d-flex align-items-center justify-content-between">
+              <div>
+                <strong class="text-dark small d-block"><i class="fa-solid fa-scale-balanced text-warning me-2"></i>Compare Destinations</strong>
+                <small class="text-muted">Side-by-side destination analytics</small>
+              </div>
+              <i class="fa-solid fa-chevron-right text-muted small"></i>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

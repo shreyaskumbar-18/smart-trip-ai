@@ -1,1 +1,111 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="planner-card mx-auto"><h1>AI Trip Planner</h1><p class="text-muted">The optimizer uses multiple objectives to build your itinerary.</p><form method="post">{% csrf_token %}{{form.as_p}}<button class="btn btn-primary btn-lg w-100">Generate Optimized Trip</button></form></div></div>{% endblock %}
+{% extends "travel/base.html" %}
+{% block title %}Plan a trip | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section pt-5 pb-5 planner-page">
+  <div class="container-xl">
+    <div class="row justify-content-center">
+      <div class="col-xl-10">
+
+        <div class="planner-heading mb-4">
+          <span class="eyebrow">Your trip, your rules</span>
+          <h1 class="section-title">Plan a trip that fits you.</h1>
+          <p class="muted">Describe your trip in plain language or fill in the form. SmartTrip ranks attractions, checks constraints and builds a route.</p>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+
+          <!-- AI Natural Language Brief Card -->
+          <div class="ai-brief-card mb-4">
+            <div class="d-flex gap-3 align-items-start">
+              <div class="ai-orb">
+                <i class="fa-solid fa-sparkles"></i>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex flex-wrap justify-content-between gap-2">
+                  <div>
+                    <span class="eyebrow text-white-50">AI trip brief</span>
+                    <h3 class="text-white fw-bold mb-1">Tell us what you have in mind</h3>
+                  </div>
+                  <span class="ai-status-pill">
+                    <span></span> Smart planning
+                  </span>
+                </div>
+
+                <p class="text-white-50 mb-3">
+                  Example: “Plan 3 days in Goa under ₹12,000 for 2 travellers. I like beaches and local food.”
+                </p>
+
+                {% if ai_prefill_note %}
+                  <div class="alert alert-info py-2">
+                    <i class="fa-solid fa-circle-check me-1"></i>{{ ai_prefill_note }}
+                  </div>
+                {% endif %}
+
+                <label class="form-label text-white fw-semibold" for="id_trip_brief">Describe your trip</label>
+                {{ form.trip_brief }}
+                {% if form.trip_brief.errors %}
+                  <div class="text-warning small mt-1">{{ form.trip_brief.errors }}</div>
+                {% endif %}
+
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+                  <div class="small text-white-50">
+                    With OPENAI_API_KEY, an LLM interprets the brief. Without a key, a local parser is used.
+                  </div>
+                  <button class="btn btn-light rounded-pill px-3" name="action" value="prefill" type="submit">
+                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Interpret brief
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Structured Form Details Card -->
+          <div class="planner-card">
+            <div class="d-flex align-items-center gap-3 mb-4">
+              <div class="section-icon coral">
+                <i class="fa-solid fa-sliders"></i>
+              </div>
+              <div>
+                <h3 class="fw-bold mb-1">Review trip details</h3>
+                <p class="muted mb-0">Check the destination, dates and budget before generating.</p>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              {% for field in form %}
+                {% if field.name != 'trip_brief' %}
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                      {{ field.label }}
+                    </label>
+                    {{ field }}
+                    {% if field.help_text %}
+                      <div class="form-text">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% if field.errors %}
+                      <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-4 pt-3 border-top">
+              <p class="muted small mb-0">
+                <i class="fa-solid fa-shield-halved me-1 text-primary"></i> Your itinerary is saved to your account.
+              </p>
+              <button class="btn btn-primary btn-lg rounded-pill px-5" name="action" value="generate" type="submit">
+                Generate itinerary <i class="fa-solid fa-arrow-right ms-2"></i>
+              </button>
+            </div>
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

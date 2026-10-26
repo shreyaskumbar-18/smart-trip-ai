@@ -1,1 +1,88 @@
-{% extends "travel/base.html" %}{% block content %}<div class="container py-5"><div class="planner-card mx-auto"><h2>Your travel profile</h2><p class="text-muted">These preferences feed the recommendation engine.</p><form method="post">{% csrf_token %}{{form.as_p}}<button class="btn btn-primary w-100">Save Preferences</button></form></div></div>{% endblock %}
+{% extends "travel/base.html" %}
+{% block title %}Profile & Preferences | SmartTrip AI{% endblock %}
+
+{% block content %}
+<section class="section pt-5 pb-5">
+    <div class="container-xl">
+        <div class="row g-4 align-items-center mb-4">
+            <div class="col-md-8">
+                <span class="eyebrow">User Profile</span>
+                <h1 class="section-title mb-1">Travel Profile &amp; Preferences</h1>
+                <p class="muted mb-0">Personalize your travel style so SmartTrip AI curates the most relevant destinations and itineraries for you.</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <span class="badge text-bg-light border px-3 py-2 rounded-pill">
+                    <i class="fa-regular fa-circle-user me-1 text-primary"></i>{{ user.username }} · {{ user.email }}
+                </span>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="planner-card h-100">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <i class="fa-solid fa-sliders text-primary fs-5"></i>
+                        <h4 class="h5 fw-bold mb-0">General Preferences</h4>
+                    </div>
+                    <p class="small text-muted mb-4">Set your baseline travel habits, favorite categories, budget ranges, and ideal pace.</p>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="profile-form-body">
+                            {{ form.as_p }}
+                        </div>
+                        <div class="mt-4 pt-2 border-top">
+                            <button type="submit" class="btn btn-primary rounded-pill px-4">
+                                <i class="fa-solid fa-floppy-disk me-1"></i>Save preferences
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="metric-card h-100">
+                    <span class="eyebrow">Learned by SmartTrip</span>
+                    <h4 class="h5 fw-bold mb-2">AI Preference Signals</h4>
+                    <p class="small muted mb-3">
+                        Dynamic weights adjusted by recommendation clicks, likes, dislikes, and itinerary planning choices.
+                    </p>
+
+                    <div class="preference-signals-list">
+                        {% for k, v in preferences.as_dict.items %}
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold small text-dark">
+                                        {% if k == "culture" %}<i class="fa-solid fa-masks-theater me-1 text-primary"></i>
+                                        {% elif k == "nature" %}<i class="fa-solid fa-tree me-1 text-success"></i>
+                                        {% elif k == "adventure" %}<i class="fa-solid fa-person-hiking me-1 text-warning"></i>
+                                        {% elif k == "food" %}<i class="fa-solid fa-utensils me-1 text-danger"></i>
+                                        {% elif k == "history" %}<i class="fa-solid fa-landmark me-1 text-info"></i>
+                                        {% elif k == "shopping" %}<i class="fa-solid fa-bag-shopping me-1 text-secondary"></i>
+                                        {% elif k == "relaxation" %}<i class="fa-solid fa-spa me-1 text-teal"></i>
+                                        {% endif %}
+                                        {{ k|title }}
+                                    </span>
+                                    <span class="badge text-bg-light fw-bold">{{ v|floatformat:2 }}</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {% widthratio v 1 100 %}%;"></div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="alert alert-light border rounded-3 p-3 mt-4 mb-0">
+                        <div class="d-flex gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles text-primary mt-1"></i>
+                            <div class="small muted">
+                                <strong>Adaptive Learning:</strong> Feedback given on itinerary items or suggested spots continuously refines these weights for future recommendations.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
