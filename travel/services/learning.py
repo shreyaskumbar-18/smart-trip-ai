@@ -43,7 +43,9 @@ def update_preference_from_feedback(user, attraction, action):
     if category not in CATEGORIES:
         return pref
 
-    delta = 0.08 if action in {"like","save"} else -0.08 if action == "dislike" else 0.0
+    if action not in {"like", "save", "dislike"}:
+        return pref
+    delta = 0.08 if action in {"like", "save"} else -0.08
     current = getattr(pref, category)
     setattr(pref, category, max(0.0, min(1.0, current + delta)))
 

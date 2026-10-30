@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Use the trip-specific assistant endpoint when inside a trip.
     function getAssistantUrl() {
         const match = window.location.pathname.match(
-            /^\/trips\/(\d+)\/?$/
+            /^\/trips\/(\d+)(?:\/(?:copilot|assistant))?\/?$/
         );
 
         if (match) {
@@ -110,12 +110,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // 3. CHAT FORM SUBMISSION
     // ========================================
     if (chatForm && chatInput && chatBody) {
+        let requestPending = false;
         chatForm.addEventListener("submit", async (event) => {
             event.preventDefault();
 
+            if (requestPending) return;
+
             const question = chatInput.value.trim();
 
-            if (!question) return;
+            if (!question) {
+                addMessage("Please enter a question before sending.");
+                chatInput.focus();
+                return;
+            }
 
             const sendButton = chatForm.querySelector(
                 'button[type="submit"], button'
@@ -127,17 +134,22 @@ document.addEventListener("DOMContentLoaded", () => {
             chatInput.value = "";
 
             if (sendButton) sendButton.disabled = true;
+            requestPending = true;
 
             const typingMessage = addMessage("Thinking...");
+            let requestTimeout;
 
             try {
                 const formData = new FormData(chatForm);
                 formData.set("question", question);
+                const controller = new AbortController();
+                requestTimeout = window.setTimeout(() => controller.abort(), 100000);
 
                 const response = await fetch(getAssistantUrl(), {
                     method: "POST",
                     body: formData,
                     credentials: "same-origin",
+                    signal: controller.signal,
                     headers: {
                         "X-Requested-With": "XMLHttpRequest"
                     }
@@ -149,56 +161,33 @@ document.addEventListener("DOMContentLoaded", () => {
                     );
                 }
 
-                const html = await response.text();
-
-                const parsedPage = new DOMParser().parseFromString(
-                    html,
-                    "text/html"
-                );
-
-                // IMPORTANT: Extract the answer paragraph only.
-                // This avoids including the SmartTrip AI heading
-                // and the Local assistant / LLM response label.
-                const answerElement = parsedPage.querySelector(
-                    ".assistant-answer p"
-                );
+                const contentType = response.headers.get("content-type") || "";
+                if (!contentType.includes("application/json")) {
+                    throw new Error("Assistant returned an unexpected response.");
+                }
+                const payload = await response.json();
 
                 if (typingMessage) {
                     typingMessage.remove();
                 }
 
-                if (answerElement) {
-                    const answerText = (
-                        answerElement.innerText ||
-                        answerElement.textContent ||
-                        ""
-                    ).trim();
-
-                    if (answerText) {
-                        addMessage(answerText);
-                    } else {
-                        addMessage(
-                            "I couldn't find an answer. Please try again."
-                        );
-                    }
+                if (typeof payload.answer === "string" && payload.answer.trim()) {
+                    addMessage(payload.answer.trim());
                 } else {
-                    addMessage(
-                        "I couldn't read the response. " +
-                        "Please open the full AI Assistant page and try again."
-                    );
+                    addMessage("I couldn't find an answer. Please try again.");
                 }
             } catch (error) {
                 if (typingMessage) {
                     typingMessage.remove();
                 }
 
-                addMessage(
-                    "Sorry, I couldn't connect right now. " +
-                    "Please check your connection and try again."
-                );
+                addMessage(error?.name === "AbortError"
+                    ? "The assistant took too long to respond. Please try again."
+                    : "Sorry, I couldn't connect right now. Please check your connection and try again.");
 
                 console.error("SmartTrip AI chat error:", error);
             } finally {
+                if (requestTimeout) window.clearTimeout(requestTimeout);
                 if (sendButton) {
                     sendButton.disabled = false;
 
@@ -206,6 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         sendButton.innerHTML = originalButton;
                     }
                 }
+                requestPending = false;
 
                 chatInput.focus();
             }

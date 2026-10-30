@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title">
+  <title id="title">Destination illustration placeholder</title>
+  <defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#c4dfe0"/><stop offset="1" stop-color="#f2dcb5"/></linearGradient></defs>
+  <rect width="960" height="480" fill="url(#bg)"/><circle cx="720" cy="120" r="54" fill="#f2c76d"/>
+  <path d="m0 350 190-152 150 118 175-190 170 193 120-108 155 104v165H0Z" fill="#789d83"/><path d="m0 399 180-111 170 93 150-114 190 132 130-87 140 84v84H0Z" fill="#476e5c"/>
+</svg>

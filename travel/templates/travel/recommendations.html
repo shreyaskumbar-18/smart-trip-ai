@@ -68,7 +68,7 @@
     <div class="row g-4">
       {% for attraction, score, reason in recommendations %}
         <div class="col-lg-6">
-          <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+          <article class="card recommendation-card h-100 overflow-hidden">
             <div class="card-body p-4 d-flex flex-column">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                 <div>
@@ -81,11 +81,8 @@
                     </span>
                   {% endif %}
                 </div>
-                <div class="text-end">
-                  <span class="badge {% if score >= 80 %}text-bg-success{% elif score >= 60 %}text-bg-primary{% else %}text-bg-info{% endif %} rounded-pill px-3 py-2 fs-6">
-                    <i class="fa-solid fa-bolt me-1"></i>{{ score|floatformat:1 }}<span class="small">/100</span>
-                  </span>
-                  <small class="d-block text-muted mt-1">Match Score</small>
+                <div class="recommendation-score" style="--recommendation-score: {{ score }}%" role="img" aria-label="Match score {{ score|floatformat:1 }} out of 100">
+                  <span>{{ score|floatformat:1 }}</span><small>/100</small>
                 </div>
               </div>
 
@@ -101,11 +98,35 @@
                 <p class="small text-muted mb-0">{{ reason }}</p>
               </div>
 
+              {% with breakdown=attraction.score_breakdown %}
+                {% if breakdown %}
+                  <details class="recommendation-breakdown small mb-3">
+                    <summary>View exact score breakdown</summary>
+                    <div class="recommendation-breakdown-body mt-2" aria-label="Exact score breakdown for {{ attraction.name }}">
+                      <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
+                        <span>Raw score: <strong>{{ breakdown.raw_score|floatformat:2 }}</strong> points</span>
+                        <span>Displayed match: <strong>{{ breakdown.score|floatformat:2 }}/100</strong></span>
+                      </div>
+                      {% if breakdown.clamped %}<p class="score-cap-note"><i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>The raw score was capped to the 0–100 display range.</p>{% endif %}
+                      <ul class="recommendation-component-list">
+                        {% for component in breakdown.components %}
+                          <li class="recommendation-component {% if component.value < 0 %}is-negative{% else %}is-positive{% endif %}">
+                            <span><i class="fa-solid {% if component.value < 0 %}fa-arrow-trend-down{% else %}fa-arrow-trend-up{% endif %}" aria-hidden="true"></i>{{ component.label }}</span>
+                            <strong>{% if component.value >= 0 %}+{% endif %}{{ component.value|floatformat:2 }}</strong>
+                          </li>
+                        {% endfor %}
+                      </ul>
+                      <p class="recommendation-feedback-note mb-0">Only factors applied by the existing scorer appear above. When recorded, positive attraction feedback adds 12 points and negative feedback subtracts 18 before the final cap.</p>
+                    </div>
+                  </details>
+                {% endif %}
+              {% endwith %}
+
               <!-- Metrics Strip -->
               <div class="row g-2 text-center pt-2 border-top">
                 <div class="col-3">
                   <small class="text-muted d-block"><i class="fa-regular fa-clock me-1"></i>Duration</small>
-                  <strong class="small">{{ attraction.duration_hours|default:attraction.duration|default:2.0 }}h</strong>
+                  <strong class="small">{{ attraction.duration_hours|default:2.0 }}h</strong>
                 </div>
                 <div class="col-3">
                   <small class="text-muted d-block"><i class="fa-solid fa-indian-rupee-sign me-1"></i>Cost</small>
@@ -122,7 +143,7 @@
               </div>
 
             </div>
-          </div>
+          </article>
         </div>
       {% empty %}
         <div class="col-12">

@@ -12,6 +12,8 @@ class OTPRequestThrottled(Exception):
 
 
 def issue_otp(user, purpose):
+    if str(getattr(settings, "EMAIL_BACKEND", "")).endswith("console.EmailBackend"):
+        raise RuntimeError("Console email delivery is disabled for OTPs because it writes codes to logs.")
     latest = OTPVerification.objects.filter(user=user, purpose=purpose).order_by("-created_at").first()
     if latest and (timezone.now() - latest.created_at).total_seconds() < 60:
         raise OTPRequestThrottled("Please wait 60 seconds before requesting another code.")
@@ -23,13 +25,6 @@ def issue_otp(user, purpose):
         code_hash=make_password(code),
         expires_at=timezone.now() + timedelta(minutes=5),
     )
-    if getattr(settings, "DEBUG", False):
-        print(f"\n=======================================================")
-        print(f" [SmartTrip AI OTP] Debug / Console Delivery")
-        print(f" Purpose   : {purpose.upper()}")
-        print(f" Recipient : {user.email}")
-        print(f" >>> OTP CODE : {code} <<<")
-        print(f"=======================================================\n")
     try:
         sent = send_mail(
             subject="SmartTrip AI verification code",
@@ -40,13 +35,7 @@ def issue_otp(user, purpose):
         )
         if sent != 1:
             raise RuntimeError("The email service did not confirm delivery.")
-    except Exception as email_err:
-        if getattr(settings, "DEBUG", False):
-            import logging
-            logging.getLogger("smarttrip").warning(
-                f"[SmartTrip AI] Email delivery issue ({email_err}). Console OTP: {code}"
-            )
-            return record
+    except Exception:
         record.delete()
         raise
     return record

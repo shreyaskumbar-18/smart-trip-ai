@@ -2,9 +2,8 @@
 {% load static %}
 {% block title %}AI Copilot | {{ trip.title }} | SmartTrip AI{% endblock %}
 
-{% block extra_head %}
+{% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 {% endblock %}
 
 {% block content %}
@@ -127,7 +126,7 @@
                       </span>
                       <div class="flex-grow-1">
                         <strong class="text-dark d-block">{{ item.attraction.name }}</strong>
-                        <small class="text-muted d-block">{{ item.attraction.category|title }} &middot; Duration {{ item.attraction.duration_hours }}h &middot; {% if item.attraction.estimated_cost == 0 %}Free{% else %}₹{{ item.attraction.estimated_cost }}{% endif %}</small>
+                        <small class="text-muted d-block">{{ item.attraction.category|title }} &middot; {{ item.start_time|time:"H:i" }}{% if item.end_time %}–{{ item.end_time|time:"H:i" }}{% endif %} &middot; Visit estimate {{ item.attraction.duration_hours }}h &middot; {% if item.attraction.estimated_cost == 0 %}Free{% else %}₹{{ item.attraction.estimated_cost }}{% endif %}</small>
                         {% if item.reason %}
                           <p class="small text-muted mb-0 mt-1" style="font-size: 0.8rem;">
                             <i class="fa-regular fa-lightbulb text-warning me-1"></i>{{ item.reason }}
@@ -155,7 +154,20 @@
             </div>
           </div>
 
-          <div id="copilotMap" class="rounded-4 overflow-hidden border" style="height: 480px; min-height: 400px;"></div>
+          <div id="copilotMap" class="rounded-4 overflow-hidden border" data-stop-count="{{ trip.items.count }}" style="height: 480px; min-height: 400px;">
+            {% if not route_points %}
+              <div class="h-100 d-flex flex-column align-items-center justify-content-center text-center p-4 text-muted">
+                <i class="fa-solid fa-location-dot fa-2x mb-2"></i>
+                <strong>No scheduled stops have valid map coordinates.</strong>
+                <small>Attraction latitude and longitude are needed to display route markers.</small>
+              </div>
+            {% endif %}
+          </div>
+          {% if route_points and route_points|length < trip.items.count %}
+            <div id="copilotMapCoordinateNotice" class="small text-muted mt-2" role="status">
+              Some scheduled stops do not have valid coordinates and are omitted from the map.
+            </div>
+          {% endif %}
           <div id="copilotMapTileNotice" class="small text-muted mt-2" role="status" aria-live="polite" hidden></div>
         </div>
       </div>
@@ -211,6 +223,7 @@
 
 <!-- Map Script -->
 {{ map_config|json_script:"map-config-data" }}
+{{ route_points|json_script:"copilot-route-points-data" }}
 <script>
 document.querySelectorAll(".refine-chip").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -222,89 +235,10 @@ document.querySelectorAll(".refine-chip").forEach((btn) => {
   });
 });
 
-const routePoints = {{ route_points|safe }};
-const mapConfigNode = document.getElementById("map-config-data");
-let mapConfig = {};
-try { mapConfig = JSON.parse(mapConfigNode?.textContent || "{}"); } catch (_) { mapConfig = {}; }
-if (document.getElementById("copilotMap") && typeof L !== "undefined") {
-  const map = L.map("copilotMap");
-  const tileNotice = document.getElementById("copilotMapTileNotice");
-  const tileUrl = (mapConfig.tile_url || "").trim();
-  const tileAttribution = (mapConfig.tile_attribution || "").trim();
-  let tileLayer = null;
-  let tileFailureShown = false;
-  if (tileUrl && tileAttribution) {
-    tileLayer = L.tileLayer(tileUrl, { maxZoom: 19, attribution: tileAttribution });
-    tileLayer.on("tileerror", () => {
-      if (tileFailureShown) return;
-      tileFailureShown = true;
-      tileLayer.remove();
-      if (tileNotice) {
-        tileNotice.textContent = "The configured map tile provider failed. Stops and routes remain available.";
-        tileNotice.hidden = false;
-      }
-    });
-    tileLayer.addTo(map);
-  } else if (tileNotice) {
-    tileNotice.textContent = "Map tiles are not configured. Stops and routes remain available.";
-    tileNotice.hidden = false;
-  }
-
-  const colors = ["#2563eb", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"];
-
-  if (routePoints.length > 0) {
-    const markers = [];
-    const daySegments = {};
-
-    routePoints.forEach((pt) => {
-      const dayColor = colors[(pt.day - 1) % colors.length];
-      const marker = L.circleMarker([pt.lat, pt.lon], {
-        radius: 9,
-        fillColor: dayColor,
-        color: "#ffffff",
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.9
-      }).addTo(map);
-
-      marker.bindPopup(`
-        <div style="min-width: 170px;">
-          <span style="background:${dayColor}; color:#fff; padding:2px 8px; border-radius:12px; font-size:11px;">Day ${pt.day}</span>
-          <strong style="display:block; margin-top:5px; font-size:14px;">${pt.name}</strong>
-          <small style="color:#64748b; display:block;">${pt.category} &middot; ${pt.time || 'Scheduled'}</small>
-          <small style="color:#16a34a; font-weight:600;">Cost: ${pt.cost === 0 ? 'Free' : '₹' + pt.cost}</small>
-        </div>
-      `);
-      markers.push([pt.lat, pt.lon]);
-
-      if (!daySegments[pt.day]) daySegments[pt.day] = [];
-      daySegments[pt.day].push([pt.lat, pt.lon]);
-    });
-
-    Object.keys(daySegments).forEach((dayNum) => {
-      const segCoords = daySegments[dayNum];
-      if (segCoords.length > 1) {
-        const segColor = colors[(dayNum - 1) % colors.length];
-        L.polyline(segCoords, {
-          color: segColor,
-          weight: 4,
-          opacity: 0.8,
-          dashArray: "6, 8"
-        }).addTo(map);
-      }
-    });
-
-    if (markers.length === 1) {
-      map.setView(markers[0], 13);
-    } else {
-      map.fitBounds(markers, { padding: [35, 35] });
-    }
-  } else {
-    map.setView([20.5937, 78.9629], 5);
-  }
-  window.addEventListener("pagehide", event => {
-    if (!event.persisted) map.remove();
-  });
-}
 </script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="{% static 'travel/js/copilot-map.js' %}"></script>
 {% endblock %}

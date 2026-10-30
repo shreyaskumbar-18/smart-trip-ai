@@ -17,6 +17,9 @@ Status is based on source inspection and tests run in the current development co
 - Dijkstra and A* shortest-path functions over weighted graphs. Decision Lab uses A* on a proximity graph built from attraction coordinates.
 - DBSCAN geographic attraction clustering with a category fallback when coordinate coverage is insufficient.
 - Budget/feasibility checks, what-if planning, weather-aware alternatives, minimum-disruption replanning, group preference aggregation with a minority-satisfaction term, sustainability scoring, saved trips, budget expenses, PDF export service, and admin analytics.
+- Editable five-category budget allocations with exact 100% validation, decimal expense amounts, and largest-remainder rounding for category targets. A migration adds these fields and rotates legacy group invite codes with a 30-day expiry; it has not been applied to the user's local database.
+- Group invitation creation and renewal use random codes with expiry; joining, voting and other state changes are POST-only, and group votes are constrained to attractions in the trip destination.
+- Itinerary visit slots use attraction durations with a 30-minute planning buffer. The buffer is not a route-time estimate.
 - Decision Lab, dedicated travel assistant page, dark mode, responsive templates and Leaflet trip map.
 
 ## Requires local setup or external service verification
@@ -28,6 +31,7 @@ Status is based on source inspection and tests run in the current development co
 - The current Knapsack budget covers attraction costs multiplied by traveler count. It does not independently allocate accommodation, transportation, meals, taxes or booking prices.
 - Graph shortest-path edges use straight-line geographic distance unless a real road graph is supplied. The A* route shown in Decision Lab is an estimated POI graph route, not road navigation.
 - The public OSRM demo endpoint is suitable for demonstration, not high-volume production traffic.
+- The migration `0003_budget_allocations_invite_expiry_decimal_expenses` must be reviewed and backed up before applying to an existing MySQL database. Its data migration rotates active group invite links, so previously shared invite codes will stop working.
 
 ## Not claimed
 

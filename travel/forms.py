@@ -2,6 +2,8 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.utils import timezone
+from decimal import Decimal
 
 from .models import (
     BudgetExpense,
@@ -117,6 +119,15 @@ class TripForm(forms.ModelForm):
                 "travelers",
                 "Travelers must be at least 1.",
             )
+        if travelers is not None and travelers > 50:
+            self.add_error("travelers", "Trips can include at most 50 travelers.")
+
+        priority = cleaned.get("sustainability_priority")
+        if priority is not None and not 0 <= priority <= 10:
+            self.add_error("sustainability_priority", "Choose a value from 0 to 10.")
+
+        if start and start < timezone.localdate():
+            self.add_error("start_date", "Trip start date cannot be in the past.")
 
         budget = cleaned.get("budget")
         if budget is not None and budget < 0:
@@ -139,6 +150,12 @@ EXPENSE_CATEGORIES = [
 
 
 class ExpenseForm(forms.ModelForm):
+    amount = forms.DecimalField(
+        min_value=Decimal("0.01"),
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"min": "0.01", "step": "0.01", "class": "form-control rounded-pill", "placeholder": "Amount in ₹"}),
+    )
     category = forms.ChoiceField(
         choices=EXPENSE_CATEGORIES,
         widget=forms.Select(attrs={"class": "form-select rounded-pill"}),
@@ -148,12 +165,55 @@ class ExpenseForm(forms.ModelForm):
         model = BudgetExpense
         fields = ("category", "amount", "description")
         widgets = {
-            "amount": forms.NumberInput(attrs={"min": 1, "class": "form-control rounded-pill", "placeholder": "Amount in ₹"}),
             "description": forms.TextInput(attrs={"class": "form-control rounded-pill", "placeholder": "e.g. Hotel reservation, Taxi, Museum entry"}),
         }
 
 
+class BudgetAllocationForm(forms.Form):
+    _number_widget = forms.NumberInput(attrs={"min": 0, "max": 100, "class": "form-control"})
+    accommodation_budget_pct = forms.IntegerField(min_value=0, max_value=100, label="Accommodation", widget=_number_widget)
+    food_budget_pct = forms.IntegerField(min_value=0, max_value=100, label="Food", widget=_number_widget)
+    transport_budget_pct = forms.IntegerField(min_value=0, max_value=100, label="Transport", widget=_number_widget)
+    activities_budget_pct = forms.IntegerField(min_value=0, max_value=100, label="Activities", widget=_number_widget)
+    miscellaneous_budget_pct = forms.IntegerField(min_value=0, max_value=100, label="Miscellaneous", widget=_number_widget)
+
+    def __init__(self, *args, trip=None, **kwargs):
+        self.trip = trip
+        has_no_bound_data = not args or args[0] is None
+        if trip is not None and has_no_bound_data and "initial" not in kwargs:
+            kwargs["initial"] = {
+                name: getattr(trip, name)
+                for name in self.base_fields
+            }
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned = super().clean()
+        if len(cleaned) == len(self.fields) and sum(cleaned.values()) != 100:
+            raise forms.ValidationError("Budget allocations must total exactly 100%.")
+        return cleaned
+
+    def save(self):
+        if self.trip is None or not self.is_valid():
+            raise ValueError("A valid form and trip are required.")
+        for name, value in self.cleaned_data.items():
+            setattr(self.trip, name, value)
+        self.trip.save(update_fields=list(self.cleaned_data))
+        return self.trip
+
+
 class ScenarioForm(forms.ModelForm):
+    preferred_interest = forms.ChoiceField(
+        required=False,
+        label="Preferred interest",
+        choices=[("", "Keep current interest")] + Trip.INTERESTS,
+    )
+    pace = forms.ChoiceField(
+        required=False,
+        label="Travel pace",
+        choices=[("", "Keep current pace")] + Trip._meta.get_field("pace").choices,
+    )
+
     class Meta:
         model = WhatIfScenario
         fields = (

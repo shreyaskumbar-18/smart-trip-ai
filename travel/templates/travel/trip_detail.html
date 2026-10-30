@@ -291,6 +291,7 @@
         </div>
 
         <!-- Day-by-day itinerary -->
+        <p class="muted small mb-3">Suggested visit times use attraction durations and a 30-minute planning buffer between stops. The buffer is not a live or road-based travel-time estimate.</p>
         {% for day in groups %}
             <div class="day-section">
 
@@ -334,7 +335,7 @@
                     <div class="itinerary-item" data-itinerary-item="{{ item.pk }}" data-previous-item-id="{{ item.previous_item_id }}">
 
                         <div class="time">
-                            {{ item.start_time|time:"H:i" }}
+                            {{ item.start_time|time:"H:i" }}{% if item.end_time %}–{{ item.end_time|time:"H:i" }}{% endif %}
                         </div>
 
                         <div class="flex-grow-1">

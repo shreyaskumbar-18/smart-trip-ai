@@ -33,7 +33,11 @@
           <h3 class="h5 fw-bold mb-0">Simulation Outcome</h3>
           {% if result.feasible %}
             <span class="badge text-bg-success rounded-pill px-3 py-2">
-              <i class="fa-solid fa-circle-check me-1"></i>Feasible Plan
+              <i class="fa-solid fa-circle-check me-1"></i>Within Estimated Budget
+            </span>
+          {% elif not result.has_itinerary %}
+            <span class="badge text-bg-secondary rounded-pill px-3 py-2">
+              <i class="fa-solid fa-circle-question me-1"></i>No Itinerary Available
             </span>
           {% else %}
             <span class="badge text-bg-danger rounded-pill px-3 py-2">
@@ -71,8 +75,38 @@
           </div>
         </div>
 
+        <p class="small {% if result.feasible %}text-success{% else %}text-danger{% endif %} mb-3" role="status">
+          {{ result.feasibility_message }}
+        </p>
+        {% if result.budget_optimized and result.has_itinerary %}
+          <p class="small muted mb-3">The first-choice schedule exceeded the attraction-ticket limit, so lower-cost stored-price options were selected. This does not change the destination-average trip-cost estimate.</p>
+        {% endif %}
+
+        {% if result.itinerary %}
+          <div class="border rounded-3 p-3 mb-3">
+            <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+              <h4 class="h6 fw-bold mb-0">Suggested itinerary preview</h4>
+              <small class="muted">{{ result.interest|title }} interest · {{ result.pace|title }} pace</small>
+            </div>
+            <div class="small muted mb-2">Estimated attraction ticket spend for {{ trip.travelers }} traveler(s): ₹{{ result.ticket_estimated }}</div>
+            <ul class="list-unstyled mb-0">
+              {% for stop in result.itinerary %}
+                <li class="py-2 border-top">
+                  <strong>Day {{ stop.day }} · {{ stop.start|time:"H:i" }}</strong>
+                  <span>{{ stop.attraction.name }}</span>
+                  <small class="muted d-block">{{ stop.attraction.category|title }} · {{ stop.reason }}</small>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% else %}
+          <div class="alert alert-warning mb-3" role="status">
+            No valid itinerary is available for these scenario constraints. Your saved trip remains unchanged.
+          </div>
+        {% endif %}
+
         <p class="small muted mb-0">
-          <i class="fa-solid fa-circle-info me-1"></i>This simulation is experimental and leaves your saved trip itinerary intact.
+          <i class="fa-solid fa-circle-info me-1"></i>This is a preview using stored attraction data. The estimated trip cost uses the destination's average daily cost; attraction tickets are shown separately. The preview does not change your saved itinerary.
         </p>
       </div>
     {% endif %}

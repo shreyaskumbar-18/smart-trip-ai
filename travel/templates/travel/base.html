@@ -73,9 +73,8 @@
             position: absolute;
             right: 0;
             bottom: 76px;
-            width: min(410px, calc(100vw - 28px));
-            height: min(600px, calc(100vh - 120px));
-            min-height: 390px;
+            width: min(380px, calc(100vw - 28px));
+            height: min(540px, calc(100dvh - 110px));
             background: #fff;
             border: 1px solid rgba(148, 163, 184, .28);
             border-radius: 22px;
@@ -372,11 +371,10 @@
             }
 
             .ai-chat {
-                right: -4px;
+                right: 0;
                 bottom: 66px;
-                width: calc(100vw - 22px);
-                height: min(570px, calc(100dvh - 100px));
-                min-height: 360px;
+                width: min(380px, calc(100vw - 24px));
+                height: min(540px, calc(100dvh - 90px));
                 border-radius: 19px;
             }
 
@@ -391,6 +389,57 @@
 
             .ai-message {
                 max-width: 98%;
+            }
+        }
+
+        /* Keep the floating chat readable when the saved theme is dark. */
+        .dark .ai-chat-body {
+            background: #111827;
+        }
+
+        .dark .ai-welcome-copy strong {
+            color: #f1f5f9;
+        }
+
+        .dark .ai-welcome-copy p,
+        .dark .ai-chat-hint {
+            color: #b6c2d1;
+        }
+
+        .dark .ai-suggestion {
+            border-color: #46556c;
+            background: #202c3d;
+            color: #e2e8f0;
+        }
+
+        .dark .ai-suggestion:hover {
+            border-color: #5abeb5;
+            background: #153b43;
+            color: #d5fffa;
+        }
+
+        .dark .ai-message:not(.ai-user):not(.ai-user-message) {
+            border-color: #344256;
+            background: #202c3d;
+            color: #e2e8f0;
+        }
+
+        .dark .ai-chat-form,
+        .dark .ai-chat-hint {
+            border-color: #344256;
+            background: #182131;
+        }
+
+        .dark .ai-chat-form input {
+            border-color: #46556c;
+            background: #111827;
+            color: #f8fafc;
+        }
+
+        @media (max-height: 460px) {
+            .ai-chat {
+                height: calc(100dvh - 86px);
+                bottom: 66px;
             }
         }
 
@@ -430,17 +479,17 @@
                 <span>SmartTrip <b>AI</b></span>
             </a>
 
-            <button
-                class="navbar-toggler"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#mainNav"
-                aria-controls="mainNav"
-                aria-label="Open navigation"
-                aria-expanded="false"
-            >
-                <span class="navbar-toggler-icon"></span>
-            </button>
+           <button
+    class="navbar-toggler"
+    type="button"
+    data-bs-toggle="collapse"
+    data-bs-target="#mainNav"
+    aria-controls="mainNav"
+    aria-label="Toggle navigation"
+    aria-expanded="false"
+>
+    <i class="fa-solid fa-bars" aria-hidden="true"></i>
+</button>
 
             <div class="collapse navbar-collapse" id="mainNav">
 

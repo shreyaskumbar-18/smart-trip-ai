@@ -7,7 +7,7 @@ real routing data is configured.
 from __future__ import annotations
 
 import heapq
-from math import asin, cos, radians, sin, sqrt
+from math import asin, cos, isfinite, radians, sin, sqrt
 
 
 def haversine_km(a, b):
@@ -21,6 +21,8 @@ def haversine_km(a, b):
     if any(value is None for value in values):
         return None
     lat1, lon1, lat2, lon2 = map(float, values)
+    if not (-90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180):
+        return None
     lat1, lon1, lat2, lon2 = map(radians, (lat1, lon1, lat2, lon2))
     dlat, dlon = lat2 - lat1, lon2 - lon1
     h = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
@@ -43,8 +45,8 @@ def dijkstra(graph, start, goal):
             break
         for neighbor, weight in graph.get(node, {}).items():
             weight = float(weight)
-            if weight < 0:
-                raise ValueError("Dijkstra requires non-negative edge weights")
+            if not isfinite(weight) or weight < 0:
+                raise ValueError("Dijkstra requires finite, non-negative edge weights")
             candidate = cost + weight
             if candidate < distances.get(neighbor, float("inf")):
                 distances[neighbor] = candidate
@@ -82,8 +84,8 @@ def a_star(graph, coordinates, start, goal):
             break
         for neighbor, weight in graph.get(node, {}).items():
             weight = float(weight)
-            if weight < 0:
-                raise ValueError("A* requires non-negative edge weights")
+            if not isfinite(weight) or weight < 0:
+                raise ValueError("A* requires finite, non-negative edge weights")
             candidate = cost + weight
             if candidate < costs.get(neighbor, float("inf")):
                 costs[neighbor] = candidate
@@ -100,12 +102,27 @@ def a_star(graph, coordinates, start, goal):
 
 
 def route_distance(route, distance_fn):
-    return sum(distance_fn(route[i], route[i + 1]) or 0.0 for i in range(len(route) - 1))
+    route = list(route)
+    total = 0.0
+    for index in range(len(route) - 1):
+        segment = distance_fn(route[index], route[index + 1])
+        if segment is None:
+            return None
+        total += float(segment)
+    return total
 
 
 def nearest_neighbor_two_opt(items, distance_fn=haversine_km):
     """Build a nearest-neighbour tour and improve it with 2-opt local search."""
     remaining = list(items)
+    # Missing coordinates are not free zero-distance edges. Optimize the
+    # geocoded subset only, then preserve unlocated stops at the end.
+    located = [item for item in remaining if distance_fn(item, item) is not None]
+    unlocated = [item for item in remaining if distance_fn(item, item) is None]
+    if unlocated:
+        if len(located) < 3:
+            return remaining
+        remaining = located
     if len(remaining) < 3:
         return remaining
     route = [remaining.pop(0)]
@@ -128,7 +145,7 @@ def nearest_neighbor_two_opt(items, distance_fn=haversine_km):
                 if after + 1e-9 < before:
                     route[i:j] = reversed(route[i:j])
                     improved = True
-    return route
+    return route + unlocated
 
 
 def build_geographic_graph(attractions, neighbors=4, max_edge_km=25.0):

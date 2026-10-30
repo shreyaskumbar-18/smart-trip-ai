@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title">
+  <title id="title">Malpe coast and St Mary's Island near Udupi</title>
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#c4e5e8"/><stop offset="1" stop-color="#f6dfaa"/></linearGradient><linearGradient id="water" x2="0" y2="1"><stop stop-color="#54aabd"/><stop offset="1" stop-color="#237789"/></linearGradient></defs>
+  <rect width="960" height="480" fill="url(#sky)"/><circle cx="760" cy="105" r="42" fill="#f3c970"/><path d="M0 250h960v230H0Z" fill="url(#water)"/>
+  <path d="M0 365q110-27 220 0t220 0 220 0 300 0v115H0Z" fill="#ecd098"/><path d="M0 265q130-15 260 0t260 0 260 0 180 0" fill="none" stroke="#e9f7ee" stroke-width="10"/>
+  <path d="M350 238q75-54 155 0l-12 18H363Z" fill="#8e7058"/><path d="m377 237 30-76 33 76Zm47 0 32-89 39 89Zm60 0 29-67 31 67Z" fill="#ae8c69"/><path d="M390 240v-51m64 46v-64m63 61v-47" stroke="#f0d5a7" stroke-width="8"/>
+</svg>

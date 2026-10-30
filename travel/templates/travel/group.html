@@ -47,6 +47,9 @@
             Share this code or link with friends so they can join, view the itinerary, and vote on attractions.
           </p>
 
+          {% if invite_expired %}
+          <div class="alert alert-warning">This invite expired. Ask the host to create a fresh invite before sharing access.</div>
+          {% else %}
           <div class="p-3 bg-light rounded-4 border text-center mb-3">
             <div class="small text-muted mb-1">Unique Invite Code</div>
             <div class="display-6 fw-bold text-primary font-monospace letter-spacing-1" id="inviteCodeText">
@@ -61,8 +64,17 @@
               </button>
             </div>
           </div>
+          <small class="text-muted d-block text-center mb-3">Invite expires {{ group.invite_expires_at|date:"M j, Y H:i" }} (local time).</small>
+          {% endif %}
 
           {% if is_owner %}
+            <form method="post" class="mb-3">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="renew_invite">
+              <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill">
+                {% if invite_expired %}Create a new invite{% else %}Rotate invite code{% endif %}
+              </button>
+            </form>
             <hr class="my-3">
             <h5 class="fw-bold mb-2">Invite by Username</h5>
             <form method="post" class="d-flex gap-2">
@@ -241,7 +253,7 @@
                     {{ item.attraction.category|default:"Sightseeing" }}
                   </span>
                 </td>
-                <td>{{ item.attraction.duration|default:2.0 }}h</td>
+                <td>{{ item.attraction.duration_hours|default:2.0 }}h</td>
                 <td>{% if item.attraction.estimated_cost == 0 %}Free{% else %}₹{{ item.attraction.estimated_cost }}{% endif %}</td>
                 <td class="text-center">
                   <span class="badge text-bg-success rounded-pill px-2 py-1 me-1">

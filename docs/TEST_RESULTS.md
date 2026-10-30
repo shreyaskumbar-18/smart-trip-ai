@@ -1,19 +1,19 @@
 # Test results
 
-Test date: 18 October 2026.
+Test date: 30 October 2026.
 
 ## Checks run
 
-- `python manage.py check` with `DB_ENGINE=sqlite`: passed, no issues reported.
-- `python manage.py makemigrations --check --dry-run` with `DB_ENGINE=sqlite`: passed, no model changes detected.
-- 29 Django tests excluding the PDF rendering test: passed.
-- Additional direct algorithm assertions for Dijkstra, A*, nearest-neighbour/2-opt and Knapsack: passed.
-- Python `compileall` over the Django project: passed.
+- Django system check with the database overridden to in-memory SQLite before setup: passed with no issues.
+- `makemigrations --check --dry-run` with the same process-scoped in-memory SQLite override: passed; no model changes were missing from migrations.
+- Focused assistant and Copilot tests: 35 passed in 104.813 seconds.
+- Full `manage.py test travel`: 161 tests passed in 521.368 seconds.
+- `node --check travel/static/travel/js/app.js`: passed.
 
-The 29 passing Django tests cover service behavior, preference updates, weather fallback, itinerary repair, trip planner and detail rendering, Decision Lab rendering, OTP hashing/email/single-use behavior, geographic DBSCAN, graph paths, and Knapsack budget limits.
+The tests used Django's temporary in-memory SQLite test database. The test runner created and destroyed that database. They cover authentication and OTP handling, trip and itinerary behavior, recommendation and optimization services, budget allocations and expenses, group invitations and voting, weather/replanning behavior, PDF export, assistant and Copilot workflows, and page rendering. MySQL was not contacted; the local `db.sqlite3` and MySQL data were not changed.
 
-## Environment limitation
+## Runtime details and limits
 
-The uploaded ZIP contained a Windows virtual environment. Its compiled Pillow/ReportLab extensions cannot load in the Linux inspection container. The PDF rendering test therefore could not be validated in this environment. `reportlab` and `Pillow` remain declared in `requirements.txt`, so reinstalling requirements in a native Windows virtual environment is required before testing PDF export there.
+The checks and tests were run with Python 3.13.1 and the project's installed packages. Pillow and ReportLab loaded successfully during the passing PDF tests.
 
-SMTP delivery to a real mailbox and connection to the user's MySQL server were not tested because private credentials and the local database service were not available. Do not describe either as verified until tested on the user's laptop.
+This run does not verify the user's MySQL connection or schema, real SMTP delivery, live Open-Meteo responses, public OSRM routes, external map tiles, or a locally configured Ollama/OpenAI provider. Those need environment-specific verification. No browser-based manual walkthrough was performed during this run.

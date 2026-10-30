@@ -6,21 +6,20 @@ echo SmartTrip AI setup
 if not exist venv (
     python -m venv venv
     if errorlevel 1 goto python_error
+    call venv\Scripts\activate
+    python -m pip install --upgrade pip
+    if errorlevel 1 goto install_error
+    python -m pip install -r requirements.txt
+    if errorlevel 1 goto install_error
 )
 call venv\Scripts\activate
-if not exist .env copy .env.example .env >nul
-python -m pip install --upgrade pip
-if errorlevel 1 goto install_error
-python -m pip install -r requirements.txt
-if errorlevel 1 goto install_error
+if not exist .env (
+    copy .env.example .env >nul
+    echo Created .env from the example. Review its local settings before continuing.
+)
 echo.
-echo Checking database migrations. Make sure MySQL Server is running and
- echo the database named in .env exists. Default: smarttrip.
-echo Configure SMTP values in .env before testing email OTP.
-python manage.py migrate
-if errorlevel 1 goto database_error
-python manage.py seed_data
-if errorlevel 1 goto database_error
+echo This launcher does not migrate or seed your database.
+echo Back up the target database and review pending migrations first.
 python manage.py check
 if errorlevel 1 goto app_error
 echo.
@@ -34,13 +33,6 @@ pause
 exit /b 1
 :install_error
 echo Dependency installation failed. Check your Python version and internet connection.
-pause
-exit /b 1
-:database_error
-echo.
-echo Database setup failed. Check .env database credentials and ensure MySQL is running.
-echo For a fresh database, run in this folder:
-echo mysql -u root -p ^< database\create_mysql_database.sql
 pause
 exit /b 1
 :app_error

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title">
+  <title id="title">Badami red sandstone cliffs and cave temples</title>
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#c5e0df"/><stop offset="1" stop-color="#f2d7aa"/></linearGradient><linearGradient id="rock" x2="0" y2="1"><stop stop-color="#cb8060"/><stop offset="1" stop-color="#874a3d"/></linearGradient></defs>
+  <rect width="960" height="480" fill="url(#sky)"/><circle cx="755" cy="91" r="43" fill="#f3c873"/>
+  <path d="M0 332 84 197l84 39 88-147 96 85 85-116 83 109 73-58 86 120 91-54 110 111v194H0Z" fill="url(#rock)"/>
+  <path d="M0 359q120-47 240 0t240 0 240 0 240 0v121H0Z" fill="#895046"/><path d="M0 402q130-36 260 0t260 0 260 0 180 0" fill="none" stroke="#d9a07b" stroke-width="10" opacity=".8"/>
+  <g fill="#422f2b"><path d="M315 357v-83q0-45 50-45t50 45v83Z"/><path d="M425 357v-110q0-48 53-48t53 48v110Z"/><path d="M546 357v-78q0-42 47-42t47 42v78Z"/></g>
+  <g fill="none" stroke="#e6ad7d" stroke-width="8"><path d="M304 357v-83q0-58 61-58t61 58v83"/><path d="M414 357v-110q0-61 64-61t64 61v110"/><path d="M535 357v-78q0-54 58-54t58 54v78"/></g>
+</svg>

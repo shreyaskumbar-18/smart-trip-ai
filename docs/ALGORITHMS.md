@@ -8,13 +8,13 @@ This document describes implemented algorithmic services in this project. Metric
 
 ## 2. Baseline itinerary generation
 
-`travel/services/optimizer.py` ranks attractions, limits the number of stops by pace, diversifies categories, distributes attractions over days, and orders each day using nearest-neighbour routing followed by a bounded 2-opt local search. The 2-opt step reverses route segments when doing so reduces the sum of pairwise Haversine distances.
+`travel/services/optimizer.py` ranks attractions, limits the number of stops by pace, diversifies categories, distributes attractions over days, and orders each day using nearest-neighbour routing followed by a bounded 2-opt local search. Suggested visit slots use each attraction's `duration_hours`, start at 09:00, include a 30-minute planning buffer between stops, and keep each day within a 10-hour planning window. The buffer is not a travel-time estimate. The 2-opt step reverses route segments when doing so reduces the sum of pairwise Haversine distances.
 
 Nearest-neighbour construction is O(n^2). A full 2-opt pass is O(n^2), and this implementation bounds the number of passes to 25. Haversine distances are straight-line estimates, not road distances or travel-time predictions.
 
 ## 3. NSGA-II multi-objective itinerary alternatives
 
-`travel/services/nsga2.py` uses binary attraction-selection chromosomes, non-dominated sorting, crowding distance, tournament selection, uniform crossover, bit-flip mutation and constraint repair. The objective vector is minimized: (100 - average preference score, 100 - average sustainability score, estimated attraction cost, estimated inter-attraction distance, 100 - itinerary coverage). The coverage objective reduces the tendency to favor one-stop plans solely because they have low cost and zero route distance. The service returns non-dominated alternatives, rather than claiming a single plan is best for every traveler.
+`travel/services/nsga2.py` uses binary attraction-selection chromosomes, non-dominated sorting, crowding distance, tournament selection, uniform crossover, bit-flip mutation and constraint repair. The objective vector is minimized: (100 - average preference score, 100 - average sustainability score, estimated attraction cost, estimated inter-attraction distance, 100 - itinerary coverage, and a penalty for missing coordinates). The coverage objective reduces the tendency to favor one-stop plans solely because they have low cost and zero route distance. Missing coordinates are not treated as zero distance. The service returns non-dominated alternatives, rather than claiming a single plan is best for every traveler.
 
 With population size N, generation count G, and M objectives, non-dominated sorting dominates runtime at approximately O(G*M*N^2), with additional work for chromosome evaluation and route calculations. The implementation limits the candidate pool to 36 attractions.
 
@@ -38,7 +38,7 @@ This is shown in Decision Lab as a separate budget-focused comparison, with a pe
 
 ## 7. Feasibility and repair
 
-`travel/services/feasibility.py` checks budget and schedule conditions. `travel/services/repair.py` attempts minimum-disruption changes and records reasons. Weather behavior depends on live weather availability; fallback conditions are labeled as demo/offline data.
+`travel/services/feasibility.py` checks hard schedule/data issues and reports advisory recommendations separately, including budget, pace, duration and straight-line distance limitations where detectable. `travel/services/repair.py` attempts minimum-disruption changes and records reasons. Weather behavior depends on live weather availability; fallback conditions are labeled as demo/offline data and do not trigger a weather-based replan.
 
 ## 8. Geographic clustering
 

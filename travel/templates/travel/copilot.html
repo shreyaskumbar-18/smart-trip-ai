@@ -192,7 +192,7 @@
                           <div class="p-2 border-bottom {% if forloop.last %}border-0{% endif %}">
                             <div class="d-flex justify-content-between align-items-center">
                               <strong class="small text-dark">{{ it.attraction.name }}</strong>
-                              <span class="badge text-bg-light border text-dark">{{ it.time }}</span>
+                              <span class="badge text-bg-light border text-dark">{{ it.time }}{% if it.end_time %}–{{ it.end_time }}{% endif %}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center mt-1">
                               <small class="text-muted">{{ it.category|title }} &middot; {{ it.duration_hours }}h</small>

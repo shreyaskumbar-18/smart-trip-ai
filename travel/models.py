@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 
 class Profile(models.Model):
@@ -134,6 +136,11 @@ class Trip(models.Model):
     sustainability_priority = models.PositiveIntegerField(default=3)
     include_hidden_gems = models.BooleanField(default=True)
     weather_adaptive = models.BooleanField(default=True)
+    accommodation_budget_pct = models.PositiveSmallIntegerField(default=35, validators=[MinValueValidator(0), MaxValueValidator(100)])
+    food_budget_pct = models.PositiveSmallIntegerField(default=25, validators=[MinValueValidator(0), MaxValueValidator(100)])
+    transport_budget_pct = models.PositiveSmallIntegerField(default=20, validators=[MinValueValidator(0), MaxValueValidator(100)])
+    activities_budget_pct = models.PositiveSmallIntegerField(default=15, validators=[MinValueValidator(0), MaxValueValidator(100)])
+    miscellaneous_budget_pct = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(0), MaxValueValidator(100)])
     created_at = models.DateTimeField(auto_now_add=True)
 
     @property
@@ -143,6 +150,19 @@ class Trip(models.Model):
     @property
     def estimated_total(self):
         return self.days * self.destination.average_daily_cost * self.travelers
+
+    def clean(self):
+        super().clean()
+        names = (
+            "accommodation_budget_pct",
+            "food_budget_pct",
+            "transport_budget_pct",
+            "activities_budget_pct",
+            "miscellaneous_budget_pct",
+        )
+        if all(getattr(self, name, None) is not None for name in names):
+            if sum(getattr(self, name) for name in names) != 100:
+                raise ValidationError("Trip budget allocations must total exactly 100%.")
 
     def __str__(self):
         return self.title
@@ -182,7 +202,7 @@ class SavedTrip(models.Model):
 class BudgetExpense(models.Model):
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="expenses")
     category = models.CharField(max_length=30)
-    amount = models.PositiveIntegerField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     description = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -191,6 +211,7 @@ class GroupTrip(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="owned_group_trips")
     trip = models.OneToOneField(Trip, on_delete=models.CASCADE, related_name="group")
     invite_code = models.CharField(max_length=30, unique=True)
+    invite_expires_at = models.DateTimeField(null=True, blank=True)
     members = models.ManyToManyField(User, related_name="group_trips", blank=True)
 
     def __str__(self):

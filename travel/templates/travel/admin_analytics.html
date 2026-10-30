@@ -2,7 +2,7 @@
 {% block title %}Admin Analytics | SmartTrip AI{% endblock %}
 
 {% block content %}
-<section class="section pt-5">
+<section class="section pt-5 admin-analytics-page">
   <div class="container-xl">
     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
       <div>
@@ -23,47 +23,54 @@
     </div>
 
     <!-- Key Platform Metrics -->
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-md-4 col-xl-2">
+    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-4 g-3 mb-4 analytics-summary-grid">
+      <div class="col">
         <div class="metric-card metric-indigo h-100">
           <small class="text-muted d-block"><i class="fa-regular fa-user me-1"></i>Total Users</small>
           <div class="metric-number">{{ users }}</div>
           <small class="text-muted">{{ verified_users }} email-verified</small>
         </div>
       </div>
-      <div class="col-6 col-md-4 col-xl-2">
+      <div class="col">
         <div class="metric-card metric-teal h-100">
           <small class="text-muted d-block"><i class="fa-solid fa-envelope-circle-check me-1"></i>Verified</small>
           <div class="metric-number">{{ verified_users }}</div>
           <small class="text-muted">OTP confirmed</small>
         </div>
       </div>
-      <div class="col-6 col-md-4 col-xl-2">
+      <div class="col">
         <div class="metric-card metric-green h-100">
           <small class="text-muted d-block"><i class="fa-solid fa-map-location-dot me-1"></i>Destinations</small>
           <div class="metric-number">{{ destinations }}</div>
           <small class="text-muted">In catalog</small>
         </div>
       </div>
-      <div class="col-6 col-md-4 col-xl-2">
+      <div class="col">
         <div class="metric-card metric-coral h-100">
           <small class="text-muted d-block"><i class="fa-solid fa-route me-1"></i>Trips Created</small>
           <div class="metric-number">{{ trips }}</div>
           <small class="text-muted">Itineraries generated</small>
         </div>
       </div>
-      <div class="col-6 col-md-4 col-xl-2">
+      <div class="col">
         <div class="metric-card metric-purple h-100">
           <small class="text-muted d-block"><i class="fa-regular fa-comments me-1"></i>Guest Reviews</small>
           <div class="metric-number">{{ reviews }}</div>
           <small class="text-muted">Community ratings</small>
         </div>
       </div>
-      <div class="col-6 col-md-4 col-xl-2">
+      <div class="col">
         <div class="metric-card h-100 border-warning">
           <small class="text-muted d-block"><i class="fa-solid fa-star text-warning me-1"></i>Average Rating</small>
           <div class="metric-number text-warning">{{ avg_rating|floatformat:1 }}<span class="fs-6 text-muted">/5</span></div>
           <small class="text-muted">Across all reviews</small>
+        </div>
+      </div>
+      <div class="col">
+        <div class="metric-card metric-teal h-100">
+          <small class="text-muted d-block"><i class="fa-solid fa-map-pin me-1"></i>Total Attractions</small>
+          <div class="metric-number">{{ total_attractions }}</div>
+          <small class="text-muted">Across the destination catalog</small>
         </div>
       </div>
     </div>
@@ -111,6 +118,50 @@
           <h4 class="fw-bold mb-0 mt-1">₹{{ total_tracked_expenses }}</h4>
           <small class="text-muted">In recorded expenses</small>
         </div>
+      </div>
+    </div>
+
+    <!-- Stored trip activity charts -->
+    <div class="row g-4 mb-4 analytics-chart-grid">
+      <div class="col-lg-7">
+        <section class="section-card analytics-chart-card h-100" aria-labelledby="trip-trend-heading">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+              <span class="eyebrow">Planning activity</span>
+              <h2 class="h5 fw-bold mb-1" id="trip-trend-heading">Trip creation trend</h2>
+              <p class="small muted mb-0">Trips created per calendar month over the last 12 months.</p>
+            </div>
+            <span class="analytics-chart-icon" aria-hidden="true"><i class="fa-solid fa-chart-line"></i></span>
+          </div>
+          {% if trip_trend_has_data %}
+            <div class="analytics-chart-frame"><canvas id="tripCreationChart" role="img" aria-label="Monthly number of trips created over the last 12 months"></canvas></div>
+            <div class="analytics-chart-fallback" id="tripCreationChartFallback" hidden aria-label="Trip creation trend data">
+              <ul>{% for month in trip_trend %}<li><span>{{ month.label }}</span><strong>{{ month.count }}</strong></li>{% endfor %}</ul>
+            </div>
+          {% else %}
+            <div class="analytics-empty-state" role="status"><i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i><p class="mb-0">No trips were created in the last 12 months.</p></div>
+          {% endif %}
+        </section>
+      </div>
+      <div class="col-lg-5">
+        <section class="section-card analytics-chart-card h-100" aria-labelledby="popular-chart-heading">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+              <span class="eyebrow">Destination interest</span>
+              <h2 class="h5 fw-bold mb-1" id="popular-chart-heading">Most planned destinations</h2>
+              <p class="small muted mb-0">Share of trip records among the five most planned destinations.</p>
+            </div>
+            <span class="analytics-chart-icon" aria-hidden="true"><i class="fa-solid fa-chart-pie"></i></span>
+          </div>
+          {% if popular_chart %}
+            <div class="analytics-chart-frame analytics-doughnut-frame"><canvas id="popularDestinationsChart" role="img" aria-label="Trip counts for the five most planned destinations"></canvas></div>
+            <div class="analytics-chart-fallback" id="popularDestinationsChartFallback" hidden aria-label="Popular destination trip counts">
+              <ul>{% for item in popular_chart %}<li><span>{{ item.label }}</span><strong>{{ item.count }}</strong></li>{% endfor %}</ul>
+            </div>
+          {% else %}
+            <div class="analytics-empty-state" role="status"><i class="fa-regular fa-compass" aria-hidden="true"></i><p class="mb-0">Destination popularity will appear after trips are planned.</p></div>
+          {% endif %}
+        </section>
       </div>
     </div>
 
@@ -266,4 +317,112 @@
 
   </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+{{ trip_trend|json_script:"analytics-trip-trend" }}
+{{ popular_chart|json_script:"analytics-popular-destinations" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const trendElement = document.getElementById("analytics-trip-trend");
+  const popularElement = document.getElementById("analytics-popular-destinations");
+  if (!trendElement || !popularElement) return;
+
+  const trend = JSON.parse(trendElement.textContent || "[]");
+  const popular = JSON.parse(popularElement.textContent || "[]");
+  const chartInstances = [];
+  const fallback = (canvasId, fallbackId) => {
+    const canvas = document.getElementById(canvasId);
+    const content = document.getElementById(fallbackId);
+    if (canvas) canvas.hidden = true;
+    if (content) content.hidden = false;
+  };
+
+  if (typeof Chart === "undefined") {
+    fallback("tripCreationChart", "tripCreationChartFallback");
+    fallback("popularDestinationsChart", "popularDestinationsChartFallback");
+    return;
+  }
+
+  const themeColors = () => {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      text: styles.getPropertyValue("--ink").trim() || "#172033",
+      muted: styles.getPropertyValue("--muted").trim() || "#687386",
+      grid: styles.getPropertyValue("--line").trim() || "#e7eaf0"
+    };
+  };
+
+  const colors = ["#ff4f5e", "#0f9f91", "#f0a43c", "#5978d5", "#8b64c8"];
+  const trendCanvas = document.getElementById("tripCreationChart");
+  if (trendCanvas && trend.length) {
+    try {
+      chartInstances.push(new Chart(trendCanvas, {
+        type: "line",
+        data: {
+          labels: trend.map((item) => item.label),
+          datasets: [{
+            label: "Trips created",
+            data: trend.map((item) => item.count),
+            borderColor: colors[0],
+            backgroundColor: "rgba(255, 79, 94, 0.14)",
+            pointBackgroundColor: colors[0],
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: themeColors().muted, maxRotation: 0, autoSkip: true }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: themeColors().muted, precision: 0 }, grid: { color: themeColors().grid } }
+          }
+        }
+      }));
+    } catch (error) { fallback("tripCreationChart", "tripCreationChartFallback"); }
+  }
+
+  const popularCanvas = document.getElementById("popularDestinationsChart");
+  if (popularCanvas && popular.length) {
+    try {
+      chartInstances.push(new Chart(popularCanvas, {
+        type: "doughnut",
+        data: {
+          labels: popular.map((item) => item.label),
+          datasets: [{ data: popular.map((item) => item.count), backgroundColor: colors, borderColor: "transparent", hoverOffset: 6 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "64%",
+          plugins: {
+            legend: { position: "bottom", labels: { color: themeColors().text, usePointStyle: true, padding: 16 } },
+            tooltip: { callbacks: { label: (context) => `${context.label}: ${context.raw} trip${context.raw === 1 ? "" : "s"}` } }
+          }
+        }
+      }));
+    } catch (error) { fallback("popularDestinationsChart", "popularDestinationsChartFallback"); }
+  }
+
+  document.getElementById("themeToggle")?.addEventListener("click", function () {
+    window.setTimeout(() => {
+      const palette = themeColors();
+      chartInstances.forEach((chart) => {
+        if (chart.options.scales?.x) chart.options.scales.x.ticks.color = palette.muted;
+        if (chart.options.scales?.y) {
+          chart.options.scales.y.ticks.color = palette.muted;
+          chart.options.scales.y.grid.color = palette.grid;
+        }
+        if (chart.options.plugins?.legend?.labels) chart.options.plugins.legend.labels.color = palette.text;
+        chart.update();
+      });
+    }, 0);
+  });
+});
+</script>
 {% endblock %}

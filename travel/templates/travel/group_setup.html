@@ -1,0 +1,17 @@
+{% extends "travel/base.html" %}
+{% block title %}Start Group Planning | SmartTrip AI{% endblock %}
+{% block content %}
+<main class="container py-5" style="max-width: 760px;">
+  <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5">
+    <span class="badge text-bg-primary rounded-pill align-self-start mb-3">Collaborative planning</span>
+    <h1 class="h2">Start a group for {{ trip.title }}</h1>
+    <p class="text-muted">Create an invitation for up to 30 days. Only the trip host can manage members and renew the invite.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_group">
+      <button class="btn btn-primary" type="submit">Create group invite</button>
+      <a class="btn btn-outline-secondary ms-2" href="{% url 'trip_detail' trip.pk %}">Back to trip</a>
+    </form>
+  </div>
+</main>
+{% endblock %}

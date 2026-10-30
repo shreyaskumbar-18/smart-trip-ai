@@ -1,9 +1,10 @@
 """SmartTrip AI Copilot service: multi-alternative generation and conversational itinerary refinement."""
 
-from datetime import time, timedelta
+from datetime import timedelta
 from .recommendation import recommendation_score, explain
 from .route_algorithms import nearest_neighbor_two_opt
 from .repair import repair_itinerary
+from .optimizer import schedule_attractions, visit_duration_minutes
 
 
 PACE_ACTIVITIES = {
@@ -15,8 +16,13 @@ PACE_ACTIVITIES = {
 
 def _distance(a, b):
     if any(getattr(x, field, None) is None for x in (a, b) for field in ("latitude", "longitude")):
-        return 0.0
+        return None
     from math import asin, cos, radians, sin, sqrt
+    coordinates = [float(getattr(x, field)) for x in (a, b) for field in ("latitude", "longitude")]
+    if not all(-180 <= value <= 180 for value in coordinates):
+        return None
+    if any(not -90 <= float(x.latitude) <= 90 for x in (a, b)):
+        return None
     lat1, lon1 = radians(float(a.latitude)), radians(float(a.longitude))
     lat2, lon2 = radians(float(b.latitude)), radians(float(b.longitude))
     dlat, dlon = lat2 - lat1, lon2 - lon1
@@ -59,7 +65,7 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
     # -------------------------------------------------------------
     # 1. Alternative: Budget Saver
     # -------------------------------------------------------------
-    budget_target_per_day = (budget * 0.15) / max(1, days)
+    budget_target_per_day = (budget * 0.15) / (max(1, days) * max(1, int(travelers or 1)))
     def budget_score(attraction):
         cost = float(attraction.estimated_cost or 0)
         base = recommendation_score(attraction, base_context)
@@ -72,7 +78,19 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
 
     ranked_budget = sorted(all_attractions, key=budget_score, reverse=True)
     limit_budget = min(days * PACE_ACTIVITIES.get(pace, 3), len(ranked_budget))
-    selected_budget = ranked_budget[:limit_budget]
+    def fit_budget(candidates, limit):
+        selected = []
+        total = 0
+        for attraction in candidates:
+            if len(selected) >= limit:
+                break
+            cost = max(0, int(attraction.estimated_cost or 0)) * max(1, int(travelers or 1))
+            if total + cost <= max(0, int(budget or 0)):
+                selected.append(attraction)
+                total += cost
+        return selected
+
+    selected_budget = fit_budget(ranked_budget, limit_budget)
 
     # -------------------------------------------------------------
     # 2. Alternative: Balanced Explorer
@@ -99,6 +117,7 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
                 selected_balanced.append(a)
                 if len(selected_balanced) >= limit_balanced:
                     break
+    selected_balanced = fit_budget(selected_balanced, limit_balanced)
 
     # -------------------------------------------------------------
     # 3. Alternative: Hidden Gems & Eco
@@ -112,14 +131,13 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
 
     ranked_gems = sorted(all_attractions, key=gem_eco_score, reverse=True)
     limit_gems = min(days * PACE_ACTIVITIES.get(pace, 3), len(ranked_gems))
-    selected_gems = ranked_gems[:limit_gems]
+    selected_gems = fit_budget(ranked_gems, limit_gems)
 
     def build_option_structure(key, title, tagline, badge_color, icon, selected_list, strategy_desc, tradeoffs):
         day_buckets = [[] for _ in range(days)]
         for idx, attr in enumerate(selected_list):
             day_buckets[idx % days].append(attr)
 
-        slots = [9, 13, 17, 19]
         day_plans = []
         total_cost = 0
         total_distance = 0.0
@@ -129,25 +147,27 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
         for d_idx, day_attrs in enumerate(day_buckets):
             ordered = _route_order(day_attrs)
             # Route distance
-            for i in range(len(ordered) - 1):
-                d = _distance(ordered[i], ordered[i + 1])
+            scheduled = schedule_attractions(ordered)
+            scheduled_attrs = [slot["attraction"] for slot in scheduled]
+            for i in range(len(scheduled_attrs) - 1):
+                d = _distance(scheduled_attrs[i], scheduled_attrs[i + 1])
                 if d is not None:
                     total_distance += d
 
             day_items = []
-            for pos, attr in enumerate(ordered):
+            for slot in scheduled:
+                attr = slot["attraction"]
                 score = recommendation_score(attr, base_context)
-                cost = attr.estimated_cost or 0
+                cost = max(0, int(attr.estimated_cost or 0)) * max(1, int(travelers or 1))
                 total_cost += cost
                 gem_scores.append(attr.hidden_gem_score or 50)
                 eco_scores.append(attr.sustainability_score or 70)
                 reason = explain(attr, base_context, score)
-                start_h = slots[min(pos, len(slots) - 1)]
-
                 day_items.append({
                     "attraction": attr,
                     "day_number": d_idx + 1,
-                    "time": time(start_h, 0).strftime("%H:%M"),
+                    "time": slot["start"].strftime("%H:%M"),
+                    "end_time": slot["end"].strftime("%H:%M"),
                     "score": score,
                     "cost": cost,
                     "reason": reason,
@@ -171,13 +191,26 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
             "strategy": strategy_desc,
             "tradeoffs": tradeoffs,
             "estimated_cost": total_cost,
-            "stop_count": len(selected_list),
-            "daily_count": round(len(selected_list) / max(1, days), 1),
+            "stop_count": sum(len(day["items"]) for day in day_plans),
+            "daily_count": round(sum(len(day["items"]) for day in day_plans) / max(1, days), 1),
+            "within_budget": total_cost <= max(0, int(budget or 0)),
+            "route_distance_complete": all(
+                _distance(day_items[i]["attraction"], day_items[i + 1]["attraction"]) is not None
+                for day in day_plans
+                for day_items in [day["items"]]
+                for i in range(len(day_items) - 1)
+            ) and all(
+                getattr(item["attraction"], field, None) is not None
+                for day in day_plans for item in day["items"]
+                for field in ("latitude", "longitude")
+            ),
             "travel_distance_km": round(total_distance, 1),
             "avg_hidden_gem": avg_gem,
             "avg_sustainability": avg_eco,
             "days": day_plans,
-            "selected_attraction_ids": [a.id for a in selected_list],
+            "selected_attraction_ids": [
+                item["attraction"].id for day in day_plans for item in day["items"]
+            ],
         }
 
     alt1 = build_option_structure(
@@ -189,9 +222,9 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
         selected_list=selected_budget,
         strategy_desc="Prioritizes free admission heritage walks, public viewpoints, and low-cost city monuments.",
         tradeoffs=[
-            "Cuts ticket expenses by up to 45%",
-            "Favors public landmarks over premium entry-fee complexes",
-            "Compact geographic clusters to keep taxi/transit fares down"
+            "Estimates attraction entry costs from the project data",
+            "Selects only a bundle that fits the configured attraction-cost limit",
+            "Uses straight-line proximity estimates; it does not price taxi or transit fares"
         ],
     )
 
@@ -205,7 +238,7 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
         strategy_desc="Harmonizes destination iconic highlights with your primary travel interest and comfortable pacing.",
         tradeoffs=[
             "Ideal balance of top-rated landmarks and regional highlights",
-            "Optimal variety across categories (history, culture, nature, food)",
+            "Balances categories (history, culture, nature, food) with a simple heuristic",
             "Moderate activity pacing suited for travelers wanting a complete overview"
         ],
     )
@@ -219,9 +252,9 @@ def generate_copilot_alternatives(destination, days, budget, travelers, interest
         selected_list=selected_gems,
         strategy_desc="Focuses on lesser-crowded treasures, lush parks, nature escapes, and certified sustainable attractions.",
         tradeoffs=[
-            "Avoids heavy tourist queues and crowded commercial zones",
-            "Highest eco-sustainability and green index rating",
-            "May omit high-profile crowded monuments in favor of authentic local retreats"
+            "Prioritizes lower stored crowd scores; these are not live visitor counts",
+            "Prioritizes the attraction sustainability fields in the seed data",
+            "May omit popular attractions when lower-crowd alternatives score higher"
         ],
     )
 
@@ -241,6 +274,14 @@ def refine_itinerary_with_prompt(trip, prompt):
     attractions = list(trip.destination.attractions.all())
     current_items = list(trip.items.select_related("attraction").order_by("day_number", "start_time", "pk"))
     current_attr_ids = {item.attraction_id for item in current_items}
+
+    if not current_items:
+        return {
+            "success": False,
+            "action_type": "no_itinerary",
+            "summary": "There is no saved itinerary to refine. Generate a trip plan first.",
+            "repaired_items": [],
+        }
 
     diff_summary = ""
     changes = []
@@ -338,7 +379,10 @@ def refine_itinerary_with_prompt(trip, prompt):
             diff_summary = f"Budget optimized: Replaced {highest_cost_item.attraction.name} with free admission {replacement.name}, saving ₹{cost_saved}."
         else:
             repaired = [{"day": it.day_number, "attraction": it.attraction, "start": it.start_time, "score": it.score, "reason": it.reason} for it in current_items]
-            diff_summary = "Your itinerary is already well-optimized for budget with economical entries."
+            if highest_cost_item and (highest_cost_item.attraction.estimated_cost or 0) > 0:
+                diff_summary = "No unused free-at-entry alternative was available, so your itinerary was left unchanged."
+            else:
+                diff_summary = "No paid attraction needed replacement, so your itinerary was left unchanged."
 
         return {
             "success": True,

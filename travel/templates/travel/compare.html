@@ -1,137 +1,127 @@
 {% extends "travel/base.html" %}
+{% load destination_images %}
 {% block title %}Compare Destinations | SmartTrip AI{% endblock %}
 
 {% block content %}
-<section class="section pt-5">
+<section class="section pt-5 comparison-page">
   <div class="container-xl">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <header class="comparison-heading d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
       <div>
         <span class="eyebrow">Decision Support</span>
-        <h1 class="section-title mb-1">Compare Destinations</h1>
-        <p class="muted mb-0">Compare up to three destinations side-by-side across cost, ratings, sustainability, and attraction highlights.</p>
+        <h1 class="section-title mb-1">Compare destinations</h1>
+        <p class="muted mb-0">Review the same travel details side by side. SmartTrip does not declare a winner.</p>
       </div>
       <a href="{% url 'destinations' %}" class="btn btn-outline-secondary rounded-pill">
-        <i class="fa-solid fa-arrow-left me-1"></i>All Destinations
+        <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>All destinations
       </a>
-    </div>
+    </header>
 
-    <form class="section-card mb-4" method="get">
-      <div class="row g-3">
-        {% for d in destinations %}
+    <form class="comparison-selector section-card mb-4" method="get" aria-label="Choose destinations to compare">
+      <input type="hidden" name="compare" value="1">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h2 class="h5 fw-bold mb-1">Choose two or three places</h2>
+          <p class="muted small mb-0">Each place must be different. Costs are average daily estimates per traveler.</p>
+        </div>
+        <span class="comparison-count-label"><i class="fa-solid fa-scale-balanced me-1" aria-hidden="true"></i>Side-by-side facts</span>
+      </div>
+      {% if selection_error %}
+        <div class="alert alert-danger" role="alert">{{ selection_error }}</div>
+      {% endif %}
+      <div class="row g-3 align-items-end">
+        {% for slot in selection_slots %}
           <div class="col-md-4">
-            <label class="form-label fw-semibold">Destination {{ forloop.counter }}</label>
-            <select class="form-select rounded-3" name="ids">
-              {% for opt in all_destinations %}
-                <option value="{{ opt.id }}" {% if opt.id == d.id %}selected{% endif %}>
-                  {{ opt.name }}, {{ opt.state }}
+            <label class="form-label fw-semibold" for="compare-destination-{{ slot.number }}">
+              Destination {{ slot.number }}{% if slot.number < 3 %} <span aria-hidden="true">*</span><span class="visually-hidden"> required</span>{% else %} <span class="muted fw-normal">(optional)</span>{% endif %}
+            </label>
+            <select class="form-select rounded-3" id="compare-destination-{{ slot.number }}" name="ids" {% if slot.number < 3 %}required{% endif %}>
+              <option value="">Select a destination</option>
+              {% for option in all_destinations %}
+                <option value="{{ option.pk }}" {% if slot.value == option.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ option.name }}, {{ option.state }}
                 </option>
               {% endfor %}
             </select>
           </div>
         {% endfor %}
-        <div class="col-12 mt-3">
+        <div class="col-12">
           <button type="submit" class="btn btn-primary rounded-pill px-4">
-            <i class="fa-solid fa-code-compare me-1"></i>Update Comparison
+            <i class="fa-solid fa-code-compare me-1" aria-hidden="true"></i>Compare selected destinations
           </button>
         </div>
       </div>
     </form>
 
-    <div class="table-responsive section-card">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th style="min-width: 150px;">Metric</th>
-            {% for d in destinations %}
-              <th style="min-width: 200px;">
-                <div class="fw-bold fs-6">{{ d.name }}</div>
-                <small class="muted fw-normal">{{ d.state }}</small>
-              </th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th>Average Rating</th>
-            {% for d in destinations %}
-              <td>
-                <span class="badge text-bg-warning rounded-pill px-2 py-1">
-                  <i class="fa-solid fa-star me-1"></i>{{ d.rating }}/5
+    {% if destinations %}
+      <div class="comparison-grid" aria-label="Destination comparison results">
+        {% for destination in destinations %}
+          <article class="comparison-card">
+            <div class="comparison-photo-wrap">
+              <img class="comparison-photo" src="{{ destination|destination_image }}" alt="Scenery in {{ destination.name }}, {{ destination.state }}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{{ destination|destination_image_fallback }}';">
+              <span class="comparison-location"><i class="fa-solid fa-location-dot me-1" aria-hidden="true"></i>{{ destination.state }}</span>
+            </div>
+            <div class="comparison-card-body">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                <h2 class="h4 fw-bold mb-0">{{ destination.name }}</h2>
+                <span class="comparison-rating" aria-label="Rating {{ destination.rating }} out of 5">
+                  <i class="fa-solid fa-star" aria-hidden="true"></i>{{ destination.rating }}<small>/5</small>
                 </span>
-              </td>
-            {% endfor %}
-          </tr>
-          <tr>
-            <th>Est. Daily Cost</th>
-            {% for d in destinations %}
-              <td><strong class="text-dark">₹{{ d.average_daily_cost }}</strong> <small class="muted">/ traveler</small></td>
-            {% endfor %}
-          </tr>
-          <tr>
-            <th>Sustainability Score</th>
-            {% for d in destinations %}
-              <td>
-                <div class="d-flex align-items-center gap-2">
-                  <span class="fw-semibold">{{ d.sustainability_score }}/100</span>
-                  <div class="progress flex-grow-1" style="height: 6px;">
-                    <div class="progress-bar bg-success" style="width: {{ d.sustainability_score }}%;"></div>
-                  </div>
-                </div>
-              </td>
-            {% endfor %}
-          </tr>
-          <tr>
-            <th>Hidden Gem Score</th>
-            {% for d in destinations %}
-              <td>
-                <div class="d-flex align-items-center gap-2">
-                  <span class="fw-semibold">{{ d.hidden_gem_score }}/100</span>
-                  <div class="progress flex-grow-1" style="height: 6px;">
-                    <div class="progress-bar bg-info" style="width: {{ d.hidden_gem_score }}%;"></div>
-                  </div>
-                </div>
-              </td>
-            {% endfor %}
-          </tr>
-          <tr>
-            <th>Safety Index</th>
-            {% for d in destinations %}
-              <td>
-                <div class="d-flex align-items-center gap-2">
-                  <span class="fw-semibold">{{ d.safety_score }}/100</span>
-                  <div class="progress flex-grow-1" style="height: 6px;">
-                    <div class="progress-bar bg-primary" style="width: {{ d.safety_score }}%;"></div>
-                  </div>
-                </div>
-              </td>
-            {% endfor %}
-          </tr>
-          <tr>
-            <th>Best Suited For</th>
-            {% for d in destinations %}
-              <td><span class="badge text-bg-light border text-dark">{{ d.best_for }}</span></td>
-            {% endfor %}
-          </tr>
-          <tr>
-            <th>Community Reviews</th>
-            {% for d in destinations %}
-              <td>{{ d.reviews.count }} review{{ d.reviews.count|pluralize }}</td>
-            {% endfor %}
-          </tr>
-          <tr>
-            <th>Action</th>
-            {% for d in destinations %}
-              <td>
-                <a href="{% url 'destination_detail' d.pk %}" class="btn btn-sm btn-outline-dark rounded-pill">
-                  View Details &rarr;
-                </a>
-              </td>
-            {% endfor %}
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              </div>
+              <p class="muted small comparison-description">{{ destination.description|truncatewords:24 }}</p>
 
+              <dl class="comparison-metrics">
+                <div class="comparison-metric">
+                  <dt><i class="fa-solid fa-indian-rupee-sign" aria-hidden="true"></i>Average daily cost</dt>
+                  <dd>{{ destination.average_daily_cost_display }} <small>per traveler / day</small></dd>
+                </div>
+                <div class="comparison-metric">
+                  <dt><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>Attractions</dt>
+                  <dd>{{ destination.attraction_count }}</dd>
+                </div>
+                <div class="comparison-metric">
+                  <dt><i class="fa-solid fa-leaf" aria-hidden="true"></i>Sustainability</dt>
+                  <dd>{{ destination.sustainability_score }} <small>/100</small></dd>
+                </div>
+                <div class="comparison-metric">
+                  <dt><i class="fa-solid fa-gem" aria-hidden="true"></i>Hidden-gem score</dt>
+                  <dd>{{ destination.hidden_gem_score }} <small>/100</small></dd>
+                </div>
+                <div class="comparison-metric">
+                  <dt><i class="fa-solid fa-shield-heart" aria-hidden="true"></i>Safety score</dt>
+                  <dd>{{ destination.safety_score }} <small>/100</small></dd>
+                </div>
+                <div class="comparison-metric">
+                  <dt><i class="fa-regular fa-comments" aria-hidden="true"></i>Community reviews</dt>
+                  <dd>{{ destination.review_count }}</dd>
+                </div>
+              </dl>
+
+              <section class="comparison-categories" aria-labelledby="categories-{{ destination.pk }}">
+                <h3 class="small fw-bold mb-2" id="categories-{{ destination.pk }}">Attraction categories</h3>
+                {% if destination.attraction_categories %}
+                  <ul class="comparison-category-list">
+                    {% for category in destination.attraction_categories %}
+                      <li><span>{{ category.name|title }}</span><span class="category-count">{{ category.count }}</span></li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  <p class="comparison-unavailable mb-0">No attraction category data available.</p>
+                {% endif %}
+              </section>
+              <a href="{% url 'destination_detail' destination.pk %}" class="btn btn-outline-primary rounded-pill w-100 mt-3">
+                View destination details <span aria-hidden="true">&rarr;</span>
+              </a>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="comparison-empty section-card text-center py-5" role="status">
+        <span class="comparison-empty-icon"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i></span>
+        <h2 class="h4 fw-bold mt-3">Your comparison starts here</h2>
+        <p class="muted mb-0">Select two or three different destinations above to see their stored travel details side by side.</p>
+      </div>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

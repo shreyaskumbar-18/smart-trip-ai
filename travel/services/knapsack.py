@@ -13,8 +13,18 @@ def select_attractions_knapsack(attractions, budget, travelers=1, scores=None, m
     budget = max(0, int(budget or 0))
     travelers = max(1, int(travelers or 1))
     scores = scores or {}
-    if not attractions or budget <= 0:
+    if not attractions or (max_items is not None and max_items <= 0):
         return {"selected": [], "total_cost": 0, "total_value": 0.0, "budget": budget, "explanations": []}
+
+    seen = set()
+    unique = []
+    for attraction in attractions:
+        item_id = getattr(attraction, "id", None)
+        key = ("id", item_id) if item_id is not None else ("object", id(attraction))
+        if key not in seen:
+            seen.add(key)
+            unique.append(attraction)
+    attractions = unique
 
     # Sparse DP states are keyed by (cost, selected_count). Keeping count in the
     # state is necessary when max_items is active, because a cheap state with

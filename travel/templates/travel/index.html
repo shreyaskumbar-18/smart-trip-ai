@@ -1,5 +1,6 @@
 {% extends "travel/base.html" %}
 {% load static %}
+{% load destination_images %}
 {% block title %}SmartTrip AI | Plan better trips{% endblock %}
 {% block content %}
 <section class="hero-home">
@@ -22,8 +23,11 @@
   <a class="btn btn-sm btn-outline-light rounded-pill px-3" href="{% url 'trip_planner' %}">
     <i class="fa-solid fa-calendar-plus me-1"></i>Plan a Trip
   </a>
+  <a class="btn btn-sm btn-light text-dark rounded-pill px-3" href="{% url 'destinations' %}">
+    <i class="fa-solid fa-map-location-dot me-1"></i>Explore All Destinations
+  </a>
 </div>
-<div class="d-flex gap-4 mt-4 small text-white-50"><span><b class="text-white">6+</b> destinations</span><span><b class="text-white">AI</b> recommendations</span><span><b class="text-white">Smart</b> replanning</span></div>
+<div class="d-flex gap-4 mt-4 small text-white-50"><span><b class="text-white">{{ destination_count }}</b> destinations</span><span><b class="text-white">AI</b> recommendations</span><span><b class="text-white">Smart</b> replanning</span></div>
 </div>
 <div class="col-lg-5">
 <div class="glass-card">
@@ -40,18 +44,14 @@
 </div></div>
 </section>
 
-<section class="section">
+<section class="section home-destinations-section">
 <div class="container-xl">
-<div class="d-flex justify-content-between align-items-end mb-4"><div><div class="eyebrow">Explore</div><h2 class="section-title mb-0">Popular destinations</h2></div><a href="{% url 'destinations' %}" class="text-decoration-none fw-bold">View all →</a></div>
-<div class="row g-4">
+<div class="home-section-heading d-flex justify-content-between align-items-end gap-3 mb-4"><div><div class="eyebrow">Explore</div><h2 class="section-title mb-1">Destinations to explore</h2><p class="muted mb-0">{{ destination_count }} destinations, ready for your next plan.</p></div><a href="{% url 'destinations' %}" class="btn btn-outline-primary rounded-pill px-4">Explore all destinations <span aria-hidden="true">→</span></a></div>
+<div class="row g-4 home-destinations-grid">
 {% for d in popular %}
 <div class="col-md-6 col-lg-4">
-  <div class="travel-card h-100 d-flex flex-column">
-    {% if d.name == 'Mysuru' %}
-      <img src="{% static 'travel/images/mysuru-palace.jpg' %}" alt="{{ d.name }}" style="display:block; width:100%; height:210px; object-fit:cover;">
-    {% else %}
-      <img src="{{ d.image_url|default:'' }}" alt="{{ d.name }}" style="display:block; width:100%; height:210px; object-fit:cover;" onerror="this.onerror=null; this.src='https://placehold.co/800x500/eaf2f5/24445c?text={{ d.name|urlencode }}';">
-    {% endif %}
+  <article class="travel-card home-destination-card h-100 d-flex flex-column">
+    <img class="home-destination-image" src="{{ d|destination_image }}" alt="{{ d.name }}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{{ d|destination_image_fallback }}';">
     <div class="card-body d-flex flex-column flex-grow-1">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <span class="chip">{{ d.state }}</span>
@@ -64,7 +64,7 @@
         <a href="{% url 'destination_detail' d.pk %}" class="btn btn-dark rounded-pill px-3">Explore</a>
       </div>
     </div>
-  </div>
+  </article>
 </div>
 {% endfor %}
 </div></div>

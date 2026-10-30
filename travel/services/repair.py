@@ -2,6 +2,7 @@
 from datetime import time
 from .recommendation import recommendation_score, explain
 from .weather import alternative_for, weather_context
+from .optimizer import visit_duration_minutes
 
 OUTDOOR_CATEGORIES = {"nature", "adventure", "relaxation"}
 
@@ -18,6 +19,7 @@ def repair_itinerary(trip, attractions, feedback_ids=None, disliked_ids=None, tr
     disliked_ids = set(disliked_ids or [])
     trip._disliked_attraction_ids = disliked_ids
     current = list(trip.items.select_related("attraction").order_by("day_number", "start_time", "pk"))
+    scheduled_attraction_ids = {item.attraction_id for item in current}
     trigger_text = (trigger or "").lower()
     if not current or any(token in trigger_text for token in ("full regenerate", "regenerate all", "start over")):
         plan = optimize_trip(trip, attractions, feedback_ids)
@@ -33,11 +35,20 @@ def repair_itinerary(trip, attractions, feedback_ids=None, disliked_ids=None, tr
         weather = weather_context(day, trip.destination, trip_date)
         is_weather_trigger = any(word in trigger_text for word in ("weather", "rain", "storm", "outdoor"))
         category = (attraction.category or "").lower()
-        has_date_forecast = weather.get("source") in {"Open-Meteo forecast", "Offline demo"}
+        # Demo conditions are illustrative and must not mutate a real plan.
+        has_date_forecast = weather.get("source") == "Open-Meteo forecast"
         affected = is_weather_trigger and has_date_forecast and weather.get("condition") in {"Rain", "Thunderstorm", "Snow"} and category in OUTDOOR_CATEGORIES
         replacement = None
         if affected:
-            replacement = alternative_for(attractions, day, used_ids, attraction.id, weather.get("condition"))
+            # Never use a stop that is already scheduled elsewhere in the
+            # itinerary as a replacement; doing so would duplicate that stop.
+            replacement = alternative_for(
+                attractions,
+                day,
+                used_ids | scheduled_attraction_ids,
+                attraction.id,
+                weather.get("condition"),
+            )
         if replacement and replacement.id not in used_ids:
             changed_count += 1
             selected = replacement
@@ -49,7 +60,11 @@ def repair_itinerary(trip, attractions, feedback_ids=None, disliked_ids=None, tr
             score = item.score
         used_ids.add(selected.id)
         start = item.start_time or time(9, 0)
-        repaired.append({"day": day, "attraction": selected, "start": start, "score": score, "reason": reason, "changed": selected.id != attraction.id, "change_reason": reason if selected.id != attraction.id else "Kept original activity to minimize disruption."})
+        end = item.end_time
+        if selected.id != attraction.id or end is None:
+            end_minutes = start.hour * 60 + start.minute + visit_duration_minutes(selected)
+            end = time(end_minutes // 60, end_minutes % 60) if end_minutes < 24 * 60 else None
+        repaired.append({"day": day, "attraction": selected, "start": start, "end": end, "score": score, "reason": reason, "changed": selected.id != attraction.id, "change_reason": reason if selected.id != attraction.id else "Kept original activity to minimize disruption."})
 
     # If the weather trigger found no affected activities, preserve the plan and state that explicitly.
     if changed_count == 0:

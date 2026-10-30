@@ -1,5 +1,7 @@
 from collections import Counter, defaultdict
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+import secrets
 
 from django.conf import settings
 from django.contrib import messages
@@ -10,12 +12,14 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Avg, Count, Q, Sum
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.utils.text import slugify
+from django.views.decorators.http import require_POST, require_http_methods
 
 from .forms import (
+    BudgetAllocationForm,
     ExpenseForm,
     ProfileForm,
     RegisterForm,
@@ -47,9 +51,9 @@ from .services.learning import (
     update_preference_from_feedback,
     aggregate_group_preferences,
 )
-from .services.optimizer import optimize_trip, itinerary_quality
+from .services.optimizer import optimize_trip, itinerary_quality, itinerary_comparison_breakdown
 from .services.poi import cluster_summary
-from .services.recommendation import recommendation_score, explain
+from .services.recommendation import recommendation_score, recommendation_score_breakdown, explain
 from .services.sustainability import trip_sustainability
 from .services.weather import alternative_for, weather_context
 from .services.ai import assistant_reply, interpret_trip_request
@@ -118,9 +122,14 @@ def _build_itinerary(trip, user):
         trip.destination.attractions.all()
     )
 
-    likes = _feedback_ids(user)
+    likes = (
+        trip._group_feedback_ids
+        if hasattr(trip, "_group_feedback_ids")
+        else _feedback_ids(user)
+    )
 
-    trip._disliked_attraction_ids = _disliked_ids(user)
+    if not hasattr(trip, "_disliked_attraction_ids"):
+        trip._disliked_attraction_ids = _disliked_ids(user)
 
     plan = optimize_trip(
         trip,
@@ -155,6 +164,7 @@ def _build_itinerary(trip, user):
             day_number=item["day"],
             attraction=item["attraction"],
             start_time=item["start"],
+            end_time=item.get("end"),
             score=item["score"],
             reason=item["reason"],
             weather_alternative=alternative,
@@ -179,7 +189,7 @@ def home(request):
         .order_by(
             "-rating",
             "-review_count",
-        )[:6]
+        )
     )
 
     return render(
@@ -188,6 +198,7 @@ def home(request):
         {
             "featured": featured,
             "popular": popular,
+            "destination_count": Destination.objects.count(),
         },
     )
 
@@ -508,7 +519,7 @@ def request_otp_login(request):
             request.session["otp_login_user_id"] = user.pk
             try:
                 issue_otp(user, "login")
-                messages.success(request, "OTP sent! Please check your email.")
+                messages.info(request, "If this account is eligible, a sign-in code has been sent to its email address.")
             except OTPRequestThrottled as e:
                 messages.warning(request, str(e))
             except Exception as e:
@@ -517,10 +528,7 @@ def request_otp_login(request):
 
             return redirect("otp_login_verify")
 
-        messages.error(
-            request,
-            "No verified account was found for this email.",
-        )
+        messages.info(request, "If this account is eligible, a sign-in code has been sent to its email address.")
 
     return render(
         request,
@@ -610,6 +618,7 @@ PASSWORD_RESET_SESSION_KEYS = (
     "reset_otp_id",
     "reset_verified_user_id",
     "reset_verified_otp_id",
+    "reset_verified_at",
     # Remove state written by the pre-binding reset flow as well.
     "reset_verified",
 )
@@ -668,13 +677,10 @@ def forgot_password(request):
 
             _bind_password_reset_otp(request, user, otp_record)
             if not reused_code:
-                messages.success(request, "Password reset OTP sent to your email.")
+                messages.info(request, "If an eligible account matches this address, a password reset code has been sent.")
             return redirect("verify_reset_otp")
 
-        messages.error(
-            request,
-            "No account was found for this email.",
-        )
+        messages.info(request, "If an eligible account matches this address, a password reset code has been sent.")
 
     return render(
         request,
@@ -725,6 +731,7 @@ def verify_reset_otp(request):
         if ok:
             request.session["reset_verified_user_id"] = user.pk
             request.session["reset_verified_otp_id"] = otp_id
+            request.session["reset_verified_at"] = timezone.now().isoformat()
 
             return redirect(
                 "set_new_password"
@@ -758,12 +765,14 @@ def set_new_password(request):
     otp_id = request.session.get("reset_otp_id")
     verified_user_id = request.session.get("reset_verified_user_id")
     verified_otp_id = request.session.get("reset_verified_otp_id")
+    verified_at = request.session.get("reset_verified_at")
 
     if (
         not user_id
         or not otp_id
         or verified_user_id != user_id
         or verified_otp_id != otp_id
+        or not verified_at
     ):
         _clear_password_reset_session(request)
         return redirect(
@@ -774,6 +783,16 @@ def set_new_password(request):
         User,
         pk=user_id,
     )
+    try:
+        verified_time = datetime.fromisoformat(verified_at)
+        if timezone.is_naive(verified_time):
+            verified_time = timezone.make_aware(verified_time)
+        if timezone.now() - verified_time > timedelta(minutes=15):
+            _clear_password_reset_session(request)
+            return redirect("forgot_password")
+    except (TypeError, ValueError):
+        _clear_password_reset_session(request)
+        return redirect("forgot_password")
     verified_otp_exists = OTPVerification.objects.filter(
         pk=otp_id,
         user_id=user_id,
@@ -1308,12 +1327,16 @@ def trip_copilot(request, pk=None):
                                     day_number=it["day"],
                                     attraction=it["attraction"],
                                     start_time=it.get("start") or time(9, 0),
+                                    end_time=it.get("end"),
                                     score=it.get("score", 0),
                                     reason=it.get("reason", ""),
                                 )
                         messages.success(request, refinement_result.get("summary", "Itinerary refined successfully."))
                     else:
-                        messages.warning(request, "Could not interpret refinement request safely.")
+                        messages.warning(
+                            request,
+                            refinement_result.get("summary", "Could not interpret refinement request safely."),
+                        )
                 return redirect("trip_copilot_detail", pk=pk)
 
             # 2. Switch to one of the 3 alternative profiles
@@ -1336,6 +1359,7 @@ def trip_copilot(request, pk=None):
                                 day_number=d["day_number"],
                                 attraction=it["attraction"],
                                 start_time=time(int(it["time"].split(":")[0]), int(it["time"].split(":")[1])),
+                                end_time=time(int(it["end_time"].split(":")[0]), int(it["end_time"].split(":")[1])) if it.get("end_time") else None,
                                 score=it["score"],
                                 reason=it["reason"],
                             )
@@ -1410,6 +1434,18 @@ def trip_copilot(request, pk=None):
     except (ValueError, TypeError):
         travelers = 2
 
+    # Keep user-controlled parameters within the ranges the existing brief
+    # parser supports before they reach algorithms that allocate per-day data.
+    if not 1 <= days <= 30:
+        messages.error(request, "Choose a trip duration from 1 to 30 days.")
+        days = 3
+    if not 1 <= travelers <= 50:
+        messages.error(request, "Choose between 1 and 50 travelers.")
+        travelers = 2
+    if not 0 <= budget <= 2_147_483_647:
+        messages.error(request, "Enter a valid non-negative budget.")
+        budget = 15000
+
     interest = request.POST.get("interest") or request.GET.get("interest") or "culture"
     pace = request.POST.get("pace") or request.GET.get("pace") or "balanced"
 
@@ -1433,40 +1469,78 @@ def trip_copilot(request, pk=None):
         if parsed.get("pace"):
             pace = parsed["pace"]
 
-    # Action: Instantiate Chosen Alternative
+    create_errors = []
     if request.method == "POST" and request.POST.get("action") == "create_from_alternative":
-        dest = get_object_or_404(Destination, pk=destination_id)
+        try:
+            submitted_days = int(request.POST.get("days", ""))
+        except (TypeError, ValueError):
+            submitted_days = 0
+        try:
+            submitted_travelers = int(request.POST.get("travelers", ""))
+        except (TypeError, ValueError):
+            submitted_travelers = 0
+        try:
+            submitted_budget = int(str(request.POST.get("budget", "")).replace(",", ""))
+        except (TypeError, ValueError):
+            submitted_budget = -1
+
+        if not 1 <= submitted_days <= 30:
+            create_errors.append("Trip duration must be from 1 to 30 days.")
+        if not 1 <= submitted_travelers <= 50:
+            create_errors.append("Travelers must be from 1 to 50.")
+        if not 0 <= submitted_budget <= 2_147_483_647:
+            create_errors.append("Enter a valid non-negative budget.")
+        if not any(str(destination.pk) == str(destination_id) for destination in all_destinations):
+            create_errors.append("Choose an available destination.")
+        if interest not in dict(Trip.INTERESTS):
+            create_errors.append("Choose a valid trip interest.")
+        if pace not in dict(Trip._meta.get_field("pace").choices):
+            create_errors.append("Choose a valid travel pace.")
+        if request.POST.get("alternative_key") not in {"budget_saver", "balanced_explorer", "hidden_gems_eco"}:
+            create_errors.append("Choose one of the available itinerary alternatives.")
+        submitted_title = request.POST.get("title", "").strip()
+        if len(submitted_title or f"{next((d.name for d in all_destinations if str(d.pk) == str(destination_id)), 'Trip')} AI Trip") > 180:
+            create_errors.append("Trip title must be 180 characters or fewer.")
+        if create_errors:
+            messages.error(request, " ".join(create_errors))
+
+    # Action: Instantiate Chosen Alternative
+    if request.method == "POST" and request.POST.get("action") == "create_from_alternative" and not create_errors:
+        dest = next(d for d in all_destinations if str(d.pk) == str(destination_id))
         alt_key = request.POST.get("alternative_key", "balanced_explorer")
         title = request.POST.get("title") or f"{dest.name} AI Trip"
-        start_date = date.today() + timedelta(days=14)
-
-        trip = Trip.objects.create(
-            user=request.user,
-            destination=dest,
-            title=title,
-            start_date=start_date,
-            end_date=start_date + timedelta(days=days - 1),
-            travelers=travelers,
-            budget=budget,
-            interest=interest,
-            pace=pace,
-        )
-
         alternatives = generate_copilot_alternatives(dest, days, budget, travelers, interest, pace, user=request.user)
-        chosen = next((a for a in alternatives if a["key"] == alt_key), alternatives[0] if alternatives else None)
-        if chosen:
-            for d in chosen["days"]:
-                for it in d["items"]:
-                    ItineraryItem.objects.create(
-                        trip=trip,
-                        day_number=d["day_number"],
-                        attraction=it["attraction"],
-                        start_time=time(int(it["time"].split(":")[0]), int(it["time"].split(":")[1])),
-                        score=it["score"],
-                        reason=it["reason"],
-                    )
+        chosen = next((a for a in alternatives if a["key"] == alt_key), None)
+        if chosen and chosen.get("stop_count", 0):
+            start_date = timezone.localdate() + timedelta(days=14)
+            with transaction.atomic():
+                trip = Trip.objects.create(
+                    user=request.user,
+                    destination=dest,
+                    title=title,
+                    start_date=start_date,
+                    end_date=start_date + timedelta(days=days - 1),
+                    travelers=travelers,
+                    budget=budget,
+                    interest=interest,
+                    pace=pace,
+                )
+                itinerary_items = []
+                for day in chosen["days"]:
+                    for item in day["items"]:
+                        itinerary_items.append(ItineraryItem(
+                            trip=trip,
+                            day_number=day["day_number"],
+                            attraction=item["attraction"],
+                            start_time=time(int(item["time"].split(":")[0]), int(item["time"].split(":")[1])),
+                            end_time=time(int(item["end_time"].split(":")[0]), int(item["end_time"].split(":")[1])) if item.get("end_time") else None,
+                            score=item["score"],
+                            reason=item["reason"],
+                        ))
+                ItineraryItem.objects.bulk_create(itinerary_items)
             messages.success(request, f"Trip '{trip.title}' created from '{chosen['title']}' alternative profile!")
             return redirect("trip_copilot_detail", pk=trip.pk)
+        messages.error(request, "That alternative has no schedulable activities, so no trip was created.")
 
     selected_destination = None
     alternatives = []
@@ -1715,18 +1789,18 @@ def feedback(
             pk=pk,
         )
 
-    RecommendationFeedback.objects.create(
-        user=request.user,
-        trip=trip,
-        attraction=item.attraction,
-        action=action,
-    )
-
-    update_preference_from_feedback(
-        request.user,
-        item.attraction,
-        action,
-    )
+    previous = RecommendationFeedback.objects.filter(
+        user=request.user, trip=trip, attraction=item.attraction
+    ).order_by("id").first()
+    if previous is None:
+        RecommendationFeedback.objects.create(
+            user=request.user, trip=trip, attraction=item.attraction, action=action
+        )
+        update_preference_from_feedback(request.user, item.attraction, action)
+    elif previous.action != action:
+        previous.action = action
+        previous.save(update_fields=["action"])
+        update_preference_from_feedback(request.user, item.attraction, action)
 
     messages.success(
         request,
@@ -1751,7 +1825,18 @@ def budget(request, pk):
         user=request.user,
     )
 
-    form = ExpenseForm(request.POST or None)
+    allocation_form = BudgetAllocationForm(
+        request.POST if request.method == "POST" and request.POST.get("action") == "save_allocations" else None,
+        trip=trip,
+    )
+    form = ExpenseForm(
+        request.POST if request.method == "POST" and request.POST.get("action") != "save_allocations" else None
+    )
+
+    if request.method == "POST" and request.POST.get("action") == "save_allocations" and allocation_form.is_valid():
+        allocation_form.save()
+        messages.success(request, "Budget allocations saved.")
+        return redirect("budget", pk=pk)
 
     if request.method == "POST" and form.is_valid():
         expense = form.save(commit=False)
@@ -1771,7 +1856,7 @@ def budget(request, pk):
     spending_percentage = (
         min(100, round(total * 100 / trip.budget))
         if trip.budget > 0
-        else 0
+        else (100 if total > 0 else 0)
     )
 
     # Daily burn rate analysis
@@ -1786,18 +1871,26 @@ def budget(request, pk):
         .order_by("-category_total")
     )
     category_labels = [item["category"] for item in category_totals]
-    category_amounts = [item["category_total"] for item in category_totals]
+    category_amounts = [float(item["category_total"]) for item in category_totals]
+    category_chart_rows = [
+        {
+            "label": item["category"],
+            "amount": item["category_total"],
+            "share_pct": round(item["category_total"] * 100 / total) if total else 0,
+        }
+        for item in category_totals
+    ]
 
     # Planned vs Actual Benchmarks
     benchmarks = [
-        {"key": "Accommodation", "label": "Accommodation & Stay", "share": 0.35, "icon": "fa-hotel"},
-        {"key": "Food", "label": "Food & Dining", "share": 0.25, "icon": "fa-utensils"},
-        {"key": "Transport", "label": "Transport & Flights", "share": 0.20, "icon": "fa-plane"},
-        {"key": "Activities", "label": "Activities & Sightseeing", "share": 0.15, "icon": "fa-ticket"},
-        {"key": "Miscellaneous", "label": "Shopping & Misc", "share": 0.05, "icon": "fa-basket-shopping"},
+        {"key": "Accommodation", "label": "Accommodation & Stay", "field": "accommodation_budget_pct", "icon": "fa-hotel"},
+        {"key": "Food", "label": "Food & Dining", "field": "food_budget_pct", "icon": "fa-utensils"},
+        {"key": "Transport", "label": "Transport & Flights", "field": "transport_budget_pct", "icon": "fa-plane"},
+        {"key": "Activities", "label": "Activities & Sightseeing", "field": "activities_budget_pct", "icon": "fa-ticket"},
+        {"key": "Miscellaneous", "label": "Miscellaneous", "field": "miscellaneous_budget_pct", "icon": "fa-basket-shopping"},
     ]
 
-    actual_by_cat = defaultdict(int)
+    actual_by_cat = defaultdict(Decimal)
     for exp in expenses:
         cat_norm = (exp.category or "").strip().lower()
         if any(w in cat_norm for w in ["hotel", "stay", "accommodation", "resort", "hostel"]):
@@ -1821,10 +1914,22 @@ def budget(request, pk):
                 actual_by_cat["Miscellaneous"] += exp.amount
 
     planned_vs_actual = []
-    category_alternatives = []
 
-    for b in benchmarks:
-        planned_val = round(trip.budget * b["share"])
+    raw_targets = [Decimal(trip.budget) * Decimal(getattr(trip, b["field"])) / Decimal(100) for b in benchmarks]
+    target_values = [int(value) for value in raw_targets]
+    remaining_units = max(0, int(trip.budget) - sum(target_values))
+    remainder_order = sorted(
+        range(len(raw_targets)),
+        key=lambda index: (raw_targets[index] - target_values[index], -index),
+        reverse=True,
+    )
+    for index in remainder_order[:remaining_units]:
+        target_values[index] += 1
+
+    category_alternatives = []
+    for benchmark_index, b in enumerate(benchmarks):
+        share_pct = int(getattr(trip, b["field"]))
+        planned_val = target_values[benchmark_index]
         actual_val = actual_by_cat[b["key"]]
         pct_used = round((actual_val / planned_val) * 100) if planned_val > 0 else (100 if actual_val > 0 else 0)
         diff = planned_val - actual_val
@@ -1836,7 +1941,7 @@ def budget(request, pk):
         planned_vs_actual.append({
             "key": b["key"],
             "label": b["label"],
-            "share_pct": int(b["share"] * 100),
+            "share_pct": share_pct,
             "planned": planned_val,
             "actual": actual_val,
             "pct_used": min(100, pct_used),
@@ -1848,33 +1953,28 @@ def budget(request, pk):
         })
 
         if is_over:
-            excess = actual_val - planned_val
             if b["key"] == "Accommodation":
                 category_alternatives.append({
                     "title": "Accommodation Savings Alternative",
                     "category": "Accommodation",
-                    "saving": round(excess * 0.35),
                     "description": "Consider booking boutique guesthouses or staying 2-3 metro stations outside the tourist center for lower room rates.",
                 })
             elif b["key"] == "Food":
                 category_alternatives.append({
                     "title": "Dining Cost Reduction Alternative",
                     "category": "Food",
-                    "saving": round(excess * 0.30),
                     "description": "Explore popular local street food lanes, heritage markets, and authentic regional thali spots instead of tourist-strip restaurants.",
                 })
             elif b["key"] == "Transport":
                 category_alternatives.append({
                     "title": "Transit Optimization Alternative",
                     "category": "Transport",
-                    "saving": round(excess * 0.25),
                     "description": "Switch from on-demand private cabs to public transit passes, metro routes, or pre-scheduled shared airport transfers.",
                 })
             elif b["key"] == "Activities":
                 category_alternatives.append({
                     "title": "Free Attraction Alternatives",
                     "category": "Activities",
-                    "saving": round(excess * 0.40),
                     "description": "Substitute paid attraction entries with free public heritage monuments, beaches, scenic viewpoints, and gardens.",
                 })
 
@@ -1916,7 +2016,6 @@ def budget(request, pk):
                 f"Daily spending is on pace at ₹{daily_burn_rate}/day (Target: ₹{target_daily_budget}/day)."
             )
 
-    # Illustrative savings only; these are not guaranteed prices or discounts.
     budget_suggestions = []
     if category_alternatives:
         budget_suggestions.extend(category_alternatives)
@@ -1927,41 +2026,34 @@ def budget(request, pk):
                 "Choose a lower-cost stay",
                 "Accommodation",
                 "Compare budget hotels, hostels, and accommodation outside premium areas.",
-                0.30,
             ),
             (
                 "Reduce transport costs",
                 "Transport",
                 "Compare public transport, shared rides, and routes with fewer transfers.",
-                0.20,
             ),
             (
                 "Prioritize free attractions",
                 "Activities",
                 "Include beaches, parks, viewpoints, and other free attractions where available.",
-                0.15,
             ),
             (
                 "Set a daily food limit",
                 "Food",
                 "Plan meals in advance and compare local, affordable food options.",
-                0.10,
             ),
         ]
         # Avoid duplicate titles
         existing_titles = {s["title"] for s in budget_suggestions}
-        for title, cat, description, percentage in suggestion_data:
+        for title, cat, description in suggestion_data:
             if title not in existing_titles:
                 budget_suggestions.append({
                     "title": title,
                     "category": cat,
                     "description": description,
-                    "saving": round(estimated_overrun * percentage),
                 })
 
-    suggested_savings = sum(item["saving"] for item in budget_suggestions)
-    optimized_estimate = max(0, estimated_trip_cost - suggested_savings)
-    optimization_gap = max(0, optimized_estimate - trip.budget)
+    optimization_gap = estimated_overrun
 
     return render(
         request,
@@ -1969,6 +2061,7 @@ def budget(request, pk):
         {
             "trip": trip,
             "form": form,
+            "allocation_form": allocation_form,
             "expenses": expenses,
             "total": total,
             "remaining": remaining,
@@ -1979,11 +2072,10 @@ def budget(request, pk):
             "target_daily_budget": target_daily_budget,
             "category_labels": category_labels,
             "category_amounts": category_amounts,
+            "category_chart_rows": category_chart_rows,
             "planned_vs_actual": planned_vs_actual,
             "spending_insights": spending_insights,
             "budget_suggestions": budget_suggestions,
-            "suggested_savings": suggested_savings,
-            "optimized_estimate": optimized_estimate,
             "optimization_gap": optimization_gap,
         },
     )
@@ -1994,7 +2086,10 @@ def edit_budget_expense(request, pk, expense_id):
     trip = get_object_or_404(Trip, pk=pk, user=request.user)
     expense = get_object_or_404(BudgetExpense, pk=expense_id, trip=trip)
 
-    form = ExpenseForm(request.POST or None, instance=expense)
+    form = ExpenseForm(
+        request.POST if request.method == "POST" else None,
+        instance=expense,
+    )
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Expense updated successfully.")
@@ -2095,25 +2190,61 @@ def recommendations(request):
     profile.include_hidden_gems = True
     profile.user = request.user
 
+    valid_feedback_actions = {
+        action for action, _label in RecommendationFeedback._meta.get_field("action").choices
+    }
+    latest_feedback_by_attraction = {}
+    feedback_records = (
+        RecommendationFeedback.objects
+        .filter(
+            user=request.user,
+            attraction__destination=destination,
+            action__in=valid_feedback_actions,
+        )
+        .order_by("created_at", "pk")
+        .values_list("attraction_id", "action")
+    )
+    for attraction_id, action in feedback_records:
+        # Collapse any legacy duplicate/conflicting rows to the latest valid
+        # action so an attraction cannot receive both direct signals at once.
+        latest_feedback_by_attraction[attraction_id] = action
+
+    positive_feedback_ids = {
+        attraction_id
+        for attraction_id, action in latest_feedback_by_attraction.items()
+        if action in {"like", "save"}
+    }
+    negative_feedback_ids = {
+        attraction_id
+        for attraction_id, action in latest_feedback_by_attraction.items()
+        if action == "dislike"
+    }
+    profile._disliked_attraction_ids = negative_feedback_ids
+
     ranked = sorted(
         destination.attractions.all(),
         key=lambda attraction: recommendation_score(
             attraction,
             profile,
+            positive_feedback_ids,
         ),
         reverse=True,
     )
 
     recommendations_data = []
     for attraction in ranked:
-        score = recommendation_score(
+        score_breakdown = recommendation_score_breakdown(
             attraction,
             profile,
+            positive_feedback_ids,
         )
+        score = score_breakdown["score"]
+        attraction.score_breakdown = score_breakdown
         explanation = explain(
             attraction,
             profile,
             score,
+            positive_feedback_ids,
         )
         recommendations_data.append(
             (
@@ -2150,7 +2281,8 @@ def what_if_view(request, pk):
     )
 
     form = ScenarioForm(
-        request.POST or None
+        request.POST or None,
+        initial={"preferred_interest": trip.interest, "pace": trip.pace},
     )
 
     result = None
@@ -2167,12 +2299,16 @@ def what_if_view(request, pk):
             trip,
             scenario.budget_change,
             scenario.extra_days,
+            preferred_interest=scenario.preferred_interest,
+            pace=form.cleaned_data.get("pace"),
         )
 
         scenario.result_summary = (
             f"Budget ₹{result['budget']}, "
             f"{result['days']} days, "
             f"estimated ₹{result['estimated']}, "
+            f"interest={result['interest']}, "
+            f"pace={result['pace']}, "
             f"feasible={result['feasible']}"
         )
 
@@ -2204,6 +2340,12 @@ def replan(request, pk):
     trip = get_object_or_404(Trip, pk=pk, user=request.user)
     trigger = request.POST.get("trigger", "Weather-aware replan").strip() if request.method == "POST" else "Weather-aware replan"
     attractions = list(trip.destination.attractions.all())
+    weather_sources = set()
+    if "weather" in trigger.lower() or "rain" in trigger.lower() or "storm" in trigger.lower():
+        weather_sources = {
+            weather_context(day, trip.destination, trip.start_date + timedelta(days=day - 1)).get("source")
+            for day in range(1, trip.days + 1)
+        }
     likes = _feedback_ids(request.user)
     disliked = _disliked_ids(request.user)
     plan = repair_itinerary(trip, attractions, likes, disliked, trigger)
@@ -2222,6 +2364,7 @@ def replan(request, pk):
                 day_number=item["day"],
                 attraction=item["attraction"],
                 start_time=item["start"],
+                end_time=item.get("end"),
                 score=item["score"],
                 reason=item["reason"],
                 weather_alternative=alternative,
@@ -2233,6 +2376,8 @@ def replan(request, pk):
         )
     if changed:
         messages.success(request, f"SmartTrip repaired your itinerary with {changed} activity change(s), preserving unaffected activities.")
+    elif weather_sources and "Open-Meteo forecast" not in weather_sources:
+        messages.info(request, "No date-specific live forecast was available. The itinerary was preserved; offline demo weather does not trigger replanning.")
     else:
         messages.info(request, "No activity replacement was needed. SmartTrip preserved the existing itinerary to minimize disruption.")
     return redirect("trip_detail", pk=pk)
@@ -2243,27 +2388,30 @@ def replan(request, pk):
 # ============================================================
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def group_trip(request, pk):
-
     trip = get_object_or_404(
         Trip,
         pk=pk,
     )
 
-    group, _ = (
-        GroupTrip.objects.get_or_create(
-            trip=trip,
-            defaults={
-                "owner": trip.user,
-                "invite_code": (
-                    f"ST{trip.id}"
-                    f"{trip.user.id}"
-                ),
-            },
-        )
-    )
+    group = GroupTrip.objects.filter(trip=trip).first()
+    is_owner = request.user == trip.user or (group is not None and request.user == group.owner)
+    if group is None:
+        if not is_owner:
+            messages.error(request, "You need an invitation to view this group trip.")
+            return redirect("dashboard")
+        if request.method == "POST" and request.POST.get("action") == "create_group":
+            group = GroupTrip.objects.create(
+                owner=trip.user,
+                trip=trip,
+                invite_code=secrets.token_urlsafe(18),
+                invite_expires_at=timezone.now() + timedelta(days=30),
+            )
+            messages.success(request, "Group collaboration is ready. This invite expires in 30 days.")
+            return redirect("group", pk=pk)
+        return render(request, "travel/group_setup.html", {"trip": trip})
 
-    is_owner = (request.user == group.owner) or (request.user == trip.user)
     is_member = is_owner or group.members.filter(id=request.user.id).exists()
 
     if not is_member:
@@ -2279,6 +2427,16 @@ def group_trip(request, pk):
             "action",
             "add",
         )
+
+        if action == "renew_invite":
+            if not is_owner:
+                messages.error(request, "Only the trip host can renew an invite.")
+            else:
+                group.invite_code = secrets.token_urlsafe(18)
+                group.invite_expires_at = timezone.now() + timedelta(days=30)
+                group.save(update_fields=["invite_code", "invite_expires_at"])
+                messages.success(request, "A new invite code is active for 30 days.")
+            return redirect("group", pk=pk)
 
         if action == "add":
 
@@ -2362,22 +2520,33 @@ def group_trip(request, pk):
             attraction_id = request.POST.get("attraction_id")
             vote_choice = request.POST.get("vote")
 
-            if attraction_id and vote_choice in {"like", "dislike"}:
-                attraction = get_object_or_404(Attraction, id=attraction_id)
-                RecommendationFeedback.objects.update_or_create(
-                    user=request.user,
-                    trip=trip,
-                    attraction=attraction,
-                    defaults={"action": vote_choice},
+            if not attraction_id or vote_choice not in {"like", "dislike"}:
+                messages.error(request, "Choose a valid attraction and vote.")
+                return redirect("group", pk=pk)
+
+            try:
+                attraction_id = int(attraction_id)
+            except (TypeError, ValueError):
+                messages.error(request, "Choose a valid attraction and vote.")
+                return redirect("group", pk=pk)
+
+            attraction = get_object_or_404(
+                Attraction, id=attraction_id, destination_id=trip.destination_id
+            )
+            previous = RecommendationFeedback.objects.filter(
+                user=request.user, trip=trip, attraction=attraction
+            ).order_by("id").first()
+            if previous is None:
+                RecommendationFeedback.objects.create(
+                    user=request.user, trip=trip, attraction=attraction,
+                    action=vote_choice,
                 )
-                try:
-                    update_preference_from_feedback(request.user, attraction, vote_choice)
-                except Exception:
-                    pass
-                messages.success(
-                    request,
-                    f"Recorded your {vote_choice} for {attraction.name}.",
-                )
+                update_preference_from_feedback(request.user, attraction, vote_choice)
+            elif previous.action != vote_choice:
+                previous.action = vote_choice
+                previous.save(update_fields=["action"])
+                update_preference_from_feedback(request.user, attraction, vote_choice)
+            messages.success(request, f"Recorded your {vote_choice} for {attraction.name}.")
 
         elif action == "optimize":
 
@@ -2397,19 +2566,38 @@ def group_trip(request, pk):
                 minority_weight=0.30,
             )
 
-            best_interest = (
-                list(group_pref_map.keys())[0]
-                if group_pref_map
-                else trip.interest
-            )
+            best_interest = trip.interest
+            if group_pref_map:
+                top_interest, top_score = next(iter(group_pref_map.items()))
+                if top_score > group_pref_map.get(trip.interest, 0.5) + 0.01:
+                    best_interest = top_interest
 
             trip.interest = best_interest
-            trip.save(update_fields=["interest"])
-
-            _build_itinerary(
-                trip,
-                trip.user,
+            member_ids = [member.pk for member in all_members]
+            group_feedback = list(
+                RecommendationFeedback.objects.filter(trip=trip, user_id__in=member_ids)
+                .values("attraction_id", "action")
             )
+            votes = Counter()
+            for feedback in group_feedback:
+                votes[(feedback["attraction_id"], feedback["action"])] += 1
+            trip._group_users = all_members
+            trip._group_feedback_ids = {
+                attraction_id for (attraction_id, action), count in votes.items()
+                if action == "like" and count > votes[(attraction_id, "dislike")]
+            }
+            trip._disliked_attraction_ids = {
+                attraction_id for (attraction_id, action), count in votes.items()
+                if action == "dislike" and count > votes[(attraction_id, "like")]
+            }
+            try:
+                with transaction.atomic():
+                    trip.save(update_fields=["interest"])
+                    _build_itinerary(trip, trip.user)
+            finally:
+                for attribute in ("_group_users", "_group_feedback_ids", "_disliked_attraction_ids"):
+                    if hasattr(trip, attribute):
+                        delattr(trip, attribute)
 
             messages.success(
                 request,
@@ -2459,6 +2647,7 @@ def group_trip(request, pk):
             "all_members": all_members,
             "group_preferences": group_preferences,
             "items": items,
+            "invite_expired": bool(not group.invite_expires_at or group.invite_expires_at <= timezone.now()),
         },
     )
 
@@ -2471,7 +2660,7 @@ def join_group_trip(request):
         or ""
     ).strip().upper()
 
-    if request.method == "POST" or (request.method == "GET" and code):
+    if request.method == "POST":
         if not code:
             messages.error(
                 request,
@@ -2483,13 +2672,17 @@ def join_group_trip(request):
         if not group:
             messages.error(
                 request,
-                f"No group trip found matching code '{code}'. Please verify the invite code.",
+                "No active group invitation matched that code. Check with the host for a current code.",
             )
             return render(
                 request,
                 "travel/join_group.html",
                 {"code": code},
             )
+
+        if not group.invite_expires_at or group.invite_expires_at <= timezone.now():
+            messages.error(request, "This invite code has expired. Ask the host to renew it.")
+            return render(request, "travel/join_group.html", {"code": ""})
 
         if request.user == group.owner or request.user == group.trip.user:
             messages.info(
@@ -2524,8 +2717,15 @@ def join_group_trip(request):
 # ============================================================
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def assistant(request, pk=None):
-    trip = get_object_or_404(Trip.objects.select_related("destination"), pk=pk, user=request.user) if pk is not None else None
+    if pk is not None:
+        accessible_trips = Trip.objects.select_related("destination").filter(
+            Q(user=request.user) | Q(group__members=request.user)
+        ).distinct()
+        trip = get_object_or_404(accessible_trips, pk=pk)
+    else:
+        trip = None
     answer = None
     source = None
     question = ""
@@ -2568,7 +2768,12 @@ def assistant(request, pk=None):
             context["user_interests"] = profile.interests
             context["travel_style"] = profile.travel_style
 
+        # The authenticated user is used only by the local itinerary planner.
+        # assistant_reply strips internal values from optional provider prompts.
+        context["_user"] = request.user
         answer, source = assistant_reply(question, context)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"answer": answer, "source": source})
     return render(request, "travel/assistant.html", {"answer": answer, "trip": trip, "answer_source": source, "question": question})
 
 
@@ -2604,33 +2809,60 @@ def delete_trip(request, pk):
 
 @login_required
 def compare_destinations(request):
+    submitted = request.GET.get("compare") == "1" or "ids" in request.GET
+    raw_ids = [value.strip() for value in request.GET.getlist("ids") if value.strip()]
+    selected_ids = []
+    selected = []
+    selection_error = ""
 
-    raw_ids = request.GET.getlist(
-        "ids"
+    if submitted:
+        if len(raw_ids) not in {2, 3}:
+            selection_error = "Choose two or three distinct destinations to compare."
+        else:
+            try:
+                selected_ids = [int(value) for value in raw_ids]
+            except (TypeError, ValueError):
+                selection_error = "One or more destination selections are invalid. Choose from the list."
+
+            if not selection_error and len(set(selected_ids)) != len(selected_ids):
+                selection_error = "Choose each destination only once."
+
+    all_destinations = list(
+        Destination.objects.annotate(review_count=Count("reviews")).order_by("name", "pk")
     )
+    if submitted and not selection_error:
+        destinations_by_id = {destination.pk: destination for destination in all_destinations}
+        if any(destination_id not in destinations_by_id for destination_id in selected_ids):
+            selection_error = "One or more selected destinations are no longer available. Choose from the list."
+        else:
+            selected = [destinations_by_id[destination_id] for destination_id in selected_ids]
+    else:
+        selected = []
 
-    ids = []
-
-    for value in raw_ids:
-
-        try:
-
-            ids.append(
-                int(value)
+    category_counts = defaultdict(list)
+    attraction_counts = defaultdict(int)
+    for row in (
+        Attraction.objects.filter(destination_id__in=[item.pk for item in selected])
+        .values("destination_id", "category")
+        .annotate(count=Count("pk"))
+        .order_by("category")
+    ):
+        attraction_counts[row["destination_id"]] += row["count"]
+        category = (row["category"] or "").strip()
+        if category:
+            category_counts[row["destination_id"]].append(
+                {"name": category, "count": row["count"]}
             )
 
-        except ValueError:
-            continue
+    for destination in selected:
+        destination.attraction_count = attraction_counts[destination.pk]
+        destination.attraction_categories = category_counts[destination.pk]
+        destination.average_daily_cost_display = f"₹{destination.average_daily_cost:,}"
 
-    selected = list(
-        Destination.objects.filter(
-            pk__in=ids[:3]
-        )
-    )
-
-    all_destinations = list(Destination.objects.all())
-    if not selected:
-        selected = all_destinations[:3]
+    selection_slots = [
+        {"number": number, "value": raw_ids[number - 1] if len(raw_ids) >= number else ""}
+        for number in (1, 2, 3)
+    ]
 
     return render(
         request,
@@ -2638,6 +2870,9 @@ def compare_destinations(request):
         {
             "destinations": selected,
             "all_destinations": all_destinations,
+            "selection_slots": selection_slots,
+            "selection_error": selection_error,
+            "selection_submitted": submitted,
         },
     )
 
@@ -2664,10 +2899,7 @@ def export_trip_pdf(request, pk):
         content_type="application/pdf",
     )
 
-    safe_title = (
-        trip.title
-        .replace(" ", "_")
-    )
+    safe_title = slugify(trip.title)[:80] or f"trip-{trip.pk}"
 
     response[
         "Content-Disposition"
@@ -2694,6 +2926,13 @@ def decision_lab(request, pk):
     feedback_ids = _feedback_ids(request.user)
 
     options = optimize_pareto(trip, attractions, feedback_ids=feedback_ids)
+    for option in options:
+        option["comparison"] = itinerary_comparison_breakdown(
+            trip,
+            option.get("attractions", []),
+            attractions,
+            feedback_ids=feedback_ids,
+        )
     scores = {a.id: recommendation_score(a, trip, feedback_ids) for a in attractions}
     knapsack = select_attractions_knapsack(attractions, trip.budget, trip.travelers, scores)
 
@@ -2756,10 +2995,64 @@ def admin_analytics(request):
     avg_trip_days = round(sum(t.days for t in all_trips) / trips_count, 1) if trips_count else 0
     avg_trip_budget = round(Trip.objects.aggregate(avg=Avg("budget"))["avg"] or 0)
     total_itinerary_items = ItineraryItem.objects.count()
+    total_attractions = Attraction.objects.count()
     group_trips_count = GroupTrip.objects.count()
     group_collaborators_count = User.objects.filter(group_trips__isnull=False).distinct().count()
     total_tracked_expenses = BudgetExpense.objects.aggregate(total=Sum("amount"))["total"] or 0
     saved_trips_count = SavedTrip.objects.count()
+
+    popular_destinations = list(
+        Destination.objects
+        .annotate(trip_count=Count("trips"))
+        .filter(trip_count__gt=0)
+        .order_by("-trip_count", "name")[:5]
+    )
+
+    current_month = timezone.localdate().replace(day=1)
+
+    month_starts = []
+    for offset in range(11, -1, -1):
+        month_index = current_month.year * 12 + current_month.month - 1 - offset
+        year, zero_based_month = divmod(month_index, 12)
+        month_starts.append(date(year, zero_based_month + 1, 1))
+
+    next_month_index = current_month.year * 12 + current_month.month
+    next_year, next_zero_based_month = divmod(next_month_index, 12)
+    next_month = date(next_year, next_zero_based_month + 1, 1)
+
+    range_start = timezone.make_aware(
+        datetime.combine(month_starts[0], time.min)
+    )
+    range_end = timezone.make_aware(
+        datetime.combine(next_month, time.min)
+    )
+
+    # Group timestamps in Python instead of using MySQL's TruncMonth.
+    # This avoids dependence on MySQL time-zone tables for date conversion.
+    monthly_trip_counts = {
+        (month.year, month.month): 0
+        for month in month_starts
+    }
+
+    trip_dates = Trip.objects.filter(
+        created_at__gte=range_start,
+        created_at__lt=range_end,
+    ).values_list("created_at", flat=True)
+
+    for created_at in trip_dates:
+        local_created_at = timezone.localtime(created_at)
+        month_key = (local_created_at.year, local_created_at.month)
+
+        if month_key in monthly_trip_counts:
+            monthly_trip_counts[month_key] += 1
+
+    trip_trend = [
+        {
+            "label": month.strftime("%b %Y"),
+            "count": monthly_trip_counts[(month.year, month.month)],
+        }
+        for month in month_starts
+    ]
 
     context = {
         "users": User.objects.count(),
@@ -2774,6 +3067,7 @@ def admin_analytics(request):
         "avg_trip_days": avg_trip_days,
         "avg_trip_budget": avg_trip_budget,
         "total_itinerary_items": total_itinerary_items,
+        "total_attractions": total_attractions,
         "group_trips_count": group_trips_count,
         "group_collaborators_count": group_collaborators_count,
         "total_tracked_expenses": total_tracked_expenses,
@@ -2781,14 +3075,13 @@ def admin_analytics(request):
         "reviews": Review.objects.count(),
         "avg_rating": avg_rating,
         "destinations": Destination.objects.count(),
-        "popular": (
-            Destination.objects
-            .annotate(
-                trip_count=Count("trips")
-            )
-            .filter(trip_count__gt=0)
-            .order_by("-trip_count", "name")[:5]
-        ),
+        "popular": popular_destinations,
+        "trip_trend": trip_trend,
+        "trip_trend_has_data": any(item["count"] for item in trip_trend),
+        "popular_chart": [
+            {"label": destination.name, "count": destination.trip_count}
+            for destination in popular_destinations
+        ],
         "top_reviewed": (
             Destination.objects
             .annotate(

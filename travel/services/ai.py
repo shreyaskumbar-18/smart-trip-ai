@@ -4,6 +4,7 @@
 import json
 import os
 import re
+from types import SimpleNamespace
 from datetime import date, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -483,6 +484,114 @@ def _database_travel_reply(question):
     return "\n".join(lines)
 
 
+def _database_destination_reply(question):
+    """List real destinations for destination-discovery questions, optionally by state."""
+    from travel.models import Destination
+
+    q = (question or "").strip().lower()
+    if not any(term in q for term in ("destination", "where should", "places in", "travel to")):
+        return None
+
+    destinations = list(Destination.objects.all().order_by("name"))
+    state = next(
+        (value for value in dict.fromkeys(item.state for item in destinations)
+         if value and re.search(rf"(?<!\w){re.escape(value.lower())}(?!\w)", q)),
+        None,
+    )
+    if state:
+        destinations = [item for item in destinations if item.state.casefold() == state.casefold()]
+        if not destinations:
+            return f"I couldn't find destinations listed for {state} in SmartTrip yet."
+        names = ", ".join(f"{item.name} (about ₹{item.average_daily_cost:,}/person/day)" for item in destinations)
+        return f"Destinations in {state} from SmartTrip's database: {names}. These are stored daily-cost estimates."
+
+    return None
+
+
+def _local_trip_plan_reply(question, context):
+    """Build a read-only itinerary preview with the existing optimizer."""
+    q = (question or "").strip().lower()
+    if not any(term in q for term in ("plan", "itinerary", "schedule")):
+        return None
+
+    from travel.models import Destination
+    from travel.services.optimizer import optimize_trip
+
+    destinations = list(Destination.objects.all().order_by("name"))
+    budget_match = re.search(r"(?:budget(?:\s+of)?|under|within|₹|rs\.?|inr)\s*₹?\s*([\d,]+)", q)
+    budget = int(budget_match.group(1).replace(",", "")) if budget_match else int(context.get("budget_inr") or 0)
+    requested_destination = next(
+        (item for item in destinations if re.search(rf"(?<!\w){re.escape(item.name.casefold())}(?!\w)", q)),
+        None,
+    )
+    destination = requested_destination
+    context_name = str(context.get("destination") or "").strip()
+    if destination is None and context_name:
+        destination = next((item for item in destinations if item.name.casefold() == context_name.casefold()), None)
+    if destination is None:
+        budget_note = f" within ₹{budget:,}" if budget else ""
+        return (
+            f"I can help plan a trip{budget_note}. Which destination and trip length should I use? "
+            "I can build a preview from SmartTrip's stored attractions and estimates; the final budget needs those trip details."
+        )
+
+    duration_match = re.search(r"\b(\d{1,2})\s*[- ]?days?\b", q)
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7}
+    if not duration_match:
+        duration_match = re.search(r"\b(one|two|three|four|five|six|seven)[- ]days?\b", q)
+    days = int(duration_match.group(1)) if duration_match and duration_match.group(1).isdigit() else (
+        words.get(duration_match.group(1)) if duration_match else context.get("days", 1)
+    )
+    days = max(1, min(int(days or 1), 14))
+
+    travelers = max(1, int(context.get("travelers") or 1))
+    interest = str(context.get("interest") or "culture").lower()
+    pace = str(context.get("pace") or "balanced").lower()
+    for option in ("culture", "nature", "adventure", "food", "history", "shopping", "relaxation"):
+        if option in q:
+            interest = option
+            break
+    if "relaxed" in q:
+        pace = "relaxed"
+    elif "packed" in q or "fast-paced" in q:
+        pace = "packed"
+
+    trip = SimpleNamespace(
+        id=None,
+        user=context.get("_user"),
+        destination=destination,
+        destination_id=destination.pk,
+        days=days,
+        travelers=travelers,
+        budget=budget,
+        interest=interest,
+        pace=pace,
+        sustainability_priority=3,
+        include_hidden_gems=True,
+    )
+    plan = optimize_trip(trip, destination.attractions.all(), concise_explanations=True)
+    if not plan:
+        return f"I couldn't build a {days}-day preview for {destination.name}; there are no usable attractions for these settings. No saved trip was changed."
+
+    lines = [f"Read-only {days}-day itinerary preview for {destination.name} ({pace} pace):"]
+    for day in range(1, days + 1):
+        entries = [item for item in plan if item["day"] == day]
+        if entries:
+            lines.append(f"Day {day}: " + "; ".join(
+                f"{item['start'].strftime('%H:%M')} {item['attraction'].name} — {item['reason']}"
+                for item in entries
+            ))
+        else:
+            lines.append(f"Day {day}: no stop could be scheduled from the available records.")
+
+    estimate = int(destination.average_daily_cost or 0) * days * travelers
+    lines.append(f"Stored destination-cost estimate: ₹{estimate:,} for {travelers} traveler(s), based on the destination's average daily cost.")
+    if budget:
+        lines.append(f"Requested budget: ₹{budget:,}. This preview does not guarantee full trip feasibility; the estimate is a destination-level average and attraction entry costs may be separate.")
+    lines.append("This preview does not save or change an itinerary. No road distances or travel times are estimated.")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------
 # MAIN CHATBOT RESPONSE
 # ---------------------------------------------------------
@@ -529,6 +638,72 @@ def _trip_recommendation_explanation(context):
         lines.append(line)
     return "\n".join(lines)
 
+
+def _is_route_question(question):
+    """Recognize route and itinerary-order questions before place lookup."""
+
+    q = re.sub(r"[^a-z0-9]+", " ", (question or "").lower()).strip()
+    route_terms = (
+        "route", "map", "distance", "travel time", "backtrack",
+        "back tracking", "shortest path", "route optimization",
+        "route optimisation", "route optimize", "route optimise",
+        "drive time", "driving time", "travel duration",
+        "time between attractions", "time between stops",
+    )
+    if any(term in q for term in route_terms):
+        return True
+
+    itinerary_terms = (
+        "order", "ordering", "sequence", "sequencing", "travel",
+        "distance", "nearby", "backtrack", "optimize", "optimise",
+    )
+    if "itinerary" in q and any(term in q for term in itinerary_terms):
+        return True
+
+    return (
+        ("attraction" in q or "stop" in q)
+        and any(term in q for term in ("time", "distance"))
+        and any(term in q for term in ("between", "nearby", "order", "sequence"))
+    )
+
+
+def _route_assistant_reply(context):
+    """Give practical route guidance without inventing road estimates."""
+
+    trip_title = str(context.get("trip_title") or "").strip()
+    destination = str(context.get("destination") or "").strip()
+    activities = [
+        str(name).strip()
+        for name in (context.get("scheduled_activities") or [])
+        if str(name).strip()
+    ]
+
+    if trip_title and destination:
+        answer = f"For {trip_title} in {destination}, "
+    elif trip_title:
+        answer = f"For {trip_title}, "
+    elif destination:
+        answer = f"For your trip in {destination}, "
+    else:
+        answer = "To reduce travel time, "
+
+    if activities:
+        answer += (
+            "your saved itinerary currently lists these stops in scheduled order: "
+            + " → ".join(activities)
+            + ". "
+        )
+
+    answer += (
+        "Group nearby attractions on the same day, visit each geographic cluster "
+        "in a sensible order, and avoid crossing the same area repeatedly. "
+        "This assistant has no live routing result for this answer, so it cannot "
+        "give reliable road distances or travel times. Treat straight-line distances "
+        "as geographic comparisons only; use road estimates from the trip map if available."
+    )
+    return answer
+
+
 def assistant_reply(question, context=None):
     """Answer travel questions using an AI provider or local database."""
 
@@ -548,6 +723,21 @@ def assistant_reply(question, context=None):
     if _is_recommendation_explanation(question):
         return _trip_recommendation_explanation(context), "local"
 
+    # Route questions can mention attractions, but must not be mistaken for
+    # destination-specific attraction recommendations by the database lookup.
+    if _is_route_question(question):
+        return _route_assistant_reply(context), "local"
+
+    # Deterministic database-backed intents stay useful when optional AI
+    # providers are unavailable, and trip previews use the existing optimizer.
+    plan_answer = _local_trip_plan_reply(question, context)
+    if plan_answer:
+        return plan_answer, "local"
+
+    destination_answer = _database_destination_reply(question)
+    if destination_answer:
+        return destination_answer, "local"
+
     # Use database-backed answers first for attraction requests.
     # This ensures strict filters are not bypassed by an LLM response.
     database_answer = _database_travel_reply(question)
@@ -564,7 +754,7 @@ def assistant_reply(question, context=None):
         "Explain that final itinerary feasibility is verified by the "
         "application's rules-based planner. "
         f"Available trip context: "
-        f"{json.dumps(context, ensure_ascii=False, default=str)}"
+        f"{json.dumps({key: value for key, value in context.items() if not key.startswith('_')}, ensure_ascii=False, default=str)}"
     )
 
     answer = _chat([
@@ -596,7 +786,7 @@ def assistant_reply(question, context=None):
                 "Each itinerary day displays forecast context. For outdoor attractions, "
                 "SmartTrip pre-computes weather-compatible indoor alternatives that you "
                 "can swap in using the dynamic replanning tool on your trip details page. "
-                "(Live weather relies on the Open-Meteo service; offline mode uses seasonal climate estimates)."
+                "(Live date forecasts rely on Open-Meteo; offline mode displays deterministic demo conditions, not a climate estimate)."
             )
         else:
             answer = (
@@ -663,13 +853,6 @@ def assistant_reply(question, context=None):
                 "Weather-aware replanning evaluates alternatives while "
                 "the itinerary repair engine aims to preserve unaffected activities."
             )
-
-    elif "route" in q or "map" in q or "distance" in q or "travel time" in q:
-        answer = (
-            "Open your trip details to view the interactive Leaflet map. "
-            "Stops are sequenced using 2-opt route optimization to minimize travel distance. "
-            "Driving distance and durations are estimated via OSRM when online, with straight-line geographic connections as fallback."
-        )
 
     elif "group" in q:
         answer = (

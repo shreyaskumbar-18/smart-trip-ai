@@ -1,6 +1,7 @@
 
 {% extends "travel/base.html" %}
 {% load static %}
+{% load destination_images %}
 
 {% block title %}{{ destination.name }} | SmartTrip AI{% endblock %}
 
@@ -14,26 +15,14 @@
             <div class="col-lg-6">
 
                 <!-- Destination image -->
-                {% with destination_name=destination.name|lower %}
-                    {% if destination_name == "mysuru" or destination_name == "mysore" %}
-                        <img
-                            src="{% static 'travel/images/mysuru-palace.jpg' %}"
-                            alt="Mysore Palace in Mysuru, Karnataka"
-                            loading="eager"
-                            decoding="async"
-                            style="display:block; width:100%; height:380px; object-fit:cover; border-radius:18px;"
-                        >
-                    {% else %}
-                        <img
-                            src="{{ destination.image_url|default:'' }}"
-                            alt="{{ destination.name }}"
-                            loading="eager"
-                            decoding="async"
-                            style="display:block; width:100%; height:380px; object-fit:cover; border-radius:18px;"
-                            onerror="this.onerror=null; this.src='https://placehold.co/800x500/eaf2f5/24445c?text=Explore+destination';"
-                        >
-                    {% endif %}
-                {% endwith %}
+                <img
+                    src="{{ destination|destination_image }}"
+                    alt="{{ destination.name }}"
+                    loading="eager"
+                    decoding="async"
+                    style="display:block; width:100%; height:380px; object-fit:cover; border-radius:18px;"
+                    onerror="this.onerror=null; this.src='{{ destination|destination_image_fallback }}';"
+                >
 
             </div>
 

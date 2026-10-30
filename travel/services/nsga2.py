@@ -19,9 +19,11 @@ PACE_LIMIT = {"relaxed": 2, "balanced": 3, "packed": 4}
 
 def _distance(a, b):
     if any(getattr(x, field, None) is None for x in (a, b) for field in ("latitude", "longitude")):
-        return 0.0
+        return None
     lat1, lon1 = radians(float(a.latitude)), radians(float(a.longitude))
     lat2, lon2 = radians(float(b.latitude)), radians(float(b.longitude))
+    if not (-radians(90) <= lat1 <= radians(90) and -radians(90) <= lat2 <= radians(90) and -radians(180) <= lon1 <= radians(180) and -radians(180) <= lon2 <= radians(180)):
+        return None
     dlat, dlon = lat2 - lat1, lon2 - lon1
     hav = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     return 6371.0 * 2 * asin(min(1.0, sqrt(hav)))
@@ -104,7 +106,18 @@ def optimize_pareto(trip, attractions, feedback_ids=None, population_size=48, ge
     Budget and daily activity count are repaired as hard constraints.
     """
     rng = random.Random(seed)
-    attractions = list(attractions)
+    unique_attractions = []
+    seen_ids = set()
+    destination_id = getattr(trip, "destination_id", None)
+    for attraction in attractions:
+        attraction_id = getattr(attraction, "id", None)
+        key = ("id", attraction_id) if attraction_id is not None else ("object", id(attraction))
+        attraction_destination = getattr(attraction, "destination_id", None)
+        if key in seen_ids or (destination_id is not None and attraction_destination is not None and attraction_destination != destination_id):
+            continue
+        seen_ids.add(key)
+        unique_attractions.append(attraction)
+    attractions = unique_attractions
     feedback_ids = set(feedback_ids or [])
     if not attractions or not getattr(trip, "days", 0):
         return []
@@ -146,11 +159,16 @@ def optimize_pareto(trip, attractions, feedback_ids=None, population_size=48, ge
         sustainability = sum(float(a.sustainability_score or 0) for a in ordered) / max(1, len(ordered))
         coverage = min(100.0, len(ordered) / max(1, max_stops) * 100.0)
         cost = sum(int(a.estimated_cost or 0) for a in ordered) * travelers
-        distance = sum(_distance(ordered[i], ordered[i + 1]) for i in range(len(ordered) - 1))
+        edges = [_distance(ordered[i], ordered[i + 1]) for i in range(len(ordered) - 1)]
+        missing_edges = sum(value is None for value in edges) + sum(
+            any(getattr(attraction, field, None) is None for field in ("latitude", "longitude"))
+            for attraction in ordered
+        )
+        distance = sum(value for value in edges if value is not None)
         # Minimize preference/sustainability deficits, cost and distance, while
         # maximizing useful itinerary coverage. This avoids favoring empty or
         # one-stop plans solely because they are cheap and have zero route length.
-        fitness = (100.0 - pref, 100.0 - sustainability, float(cost), float(distance), 100.0 - coverage)
+        fitness = (100.0 - pref, 100.0 - sustainability, float(cost), float(distance), 100.0 - coverage, float(missing_edges))
         return {"bits": bits, "fitness": fitness, "selected": ordered}
 
     population = []
@@ -219,7 +237,7 @@ def optimize_pareto(trip, attractions, feedback_ids=None, population_size=48, ge
         for pos, attraction in enumerate(ordered):
             day_plans[pos % trip.days].append({
                 "attraction": attraction,
-                "reason": explain(attraction, trip, scores[attraction.id]),
+                "reason": explain(attraction, trip, scores[attraction.id], feedback_ids),
                 "score": scores[attraction.id],
             })
         result.append({
@@ -232,8 +250,9 @@ def optimize_pareto(trip, attractions, feedback_ids=None, population_size=48, ge
             "stop_count": len(ordered),
             "estimated_cost": cost,
             "travel_distance_km": distance,
+            "route_distance_complete": item["fitness"][5] == 0,
             "budget_remaining": max(0, budget - cost),
-            "reasons": {a.id: explain(a, trip, scores[a.id]) for a in ordered},
+            "reasons": {a.id: explain(a, trip, scores[a.id], feedback_ids) for a in ordered},
             "algorithm": "NSGA-II",
         })
     return result

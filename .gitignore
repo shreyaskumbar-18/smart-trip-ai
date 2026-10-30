@@ -1,28 +1,16 @@
-# Environment and secrets
 .env
-.env.*
-!.env.example
-
-# Python
 venv/
-.venv/
 __pycache__/
 *.py[cod]
-
-# Databases
-*.sqlite3
 *.sqlite3-journal
-
-# Django generated files
 staticfiles/
 media/
-
-# Archives
 *.zip
-
-# IDE settings
-.vscode/
-.idea/
-
-# OS files
 .DS_Store
+.env
+/db.sqlite3
+
+# Local backup and temporary files
+/smarttrip_backup_before_migration.sql
+/budget_changes.txt
+/packages_backup.txt

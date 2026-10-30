@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title">
+  <title id="title">Mangaluru coastline</title>
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#b8dfe8"/><stop offset="1" stop-color="#f4d79a"/></linearGradient><linearGradient id="sea" x2="0" y2="1"><stop stop-color="#3f9ab0"/><stop offset="1" stop-color="#17647a"/></linearGradient></defs>
+  <rect width="960" height="480" fill="url(#sky)"/><circle cx="730" cy="105" r="48" fill="#f6c66d"/>
+  <path d="M0 250q130-22 260 0t260 0 260 0 180 0v230H0Z" fill="url(#sea)"/><path d="M0 240q120-18 240 0t240 0 240 0 240 0" fill="none" stroke="#eaf4e9" stroke-width="12" opacity=".9"/>
+  <path d="M0 360q150-25 300 0t300 0 360 0v120H0Z" fill="#f1d398"/><path d="M0 380q145-20 290 0t290 0 380 0" fill="none" stroke="#fff0cd" stroke-width="9"/>
+  <g fill="#49764d"><path d="m185 350 26-105 26 105Zm-18-92q42-47 86 0-42 16-86 0Z"/><path d="m790 350 26-105 26 105Zm-19-92q43-47 87 0-43 16-87 0Z"/></g>
+</svg>

@@ -6,6 +6,12 @@ weather backup alternatives, and budget summaries.
 """
 from datetime import timedelta
 from io import BytesIO
+from xml.sax.saxutils import escape
+
+
+def _xml(value):
+    """Escape user/database text before placing it in ReportLab Paragraph XML."""
+    return escape(str(value or ""), {"\"": "&quot;", "'": "&apos;"})
 
 
 def trip_pdf(trip):
@@ -118,10 +124,10 @@ def trip_pdf(trip):
 
     # 1. Header Banner
     story.append(Paragraph("SmartTrip AI — Travel Itinerary", title_style))
-    dest_name = getattr(trip.destination, "name", "Destination")
-    dest_state = getattr(trip.destination, "state", "")
+    dest_name = _xml(getattr(trip.destination, "name", "Destination"))
+    dest_state = _xml(getattr(trip.destination, "state", ""))
     dest_str = f"{dest_name}, {dest_state}" if dest_state else dest_name
-    story.append(Paragraph(f"<b>{trip.title}</b> · Exploring {dest_str}", subtitle_style))
+    story.append(Paragraph(f"<b>{_xml(trip.title)}</b> · Exploring {dest_str}", subtitle_style))
     story.append(Spacer(1, 4))
 
     # 2. Trip Overview Table
@@ -140,13 +146,13 @@ def trip_pdf(trip):
             Paragraph("<b>Travelers:</b>", cell_style),
             Paragraph(f"{trip.travelers} person{'s' if trip.travelers != 1 else ''}", cell_style),
             Paragraph("<b>Travel Pace & Style:</b>", cell_style),
-            Paragraph(f"{trip.pace.title()} pace · {trip.interest.title()}", cell_style),
+            Paragraph(f"{_xml(trip.pace).title()} pace · {_xml(trip.interest).title()}", cell_style),
         ],
         [
             Paragraph("<b>Total Budget:</b>", cell_style),
-            Paragraph(f"₹{trip.budget:,}", cell_bold),
+            Paragraph(f"INR {trip.budget:,}", cell_bold),
             Paragraph("<b>Estimated Spend:</b>", cell_style),
-            Paragraph(f"₹{trip.estimated_total:,}", cell_bold),
+            Paragraph(f"INR {trip.estimated_total:,}", cell_bold),
         ],
     ]
 
@@ -203,26 +209,26 @@ def trip_pdf(trip):
                 time_str = item.start_time.strftime("%H:%M") if item.start_time else "—"
 
                 # Attraction column
-                cat_str = attraction.category.title() if attraction.category else "Attraction"
+                cat_str = _xml(attraction.category).title() if attraction.category else "Attraction"
                 dur_str = f"~{attraction.duration_hours}h" if attraction.duration_hours else ""
                 meta_sub = f"{cat_str} {('· ' + dur_str) if dur_str else ''}"
-                attr_html = f"<b>{attraction.name}</b><br/><font color='#64748b' size='7'>{meta_sub}</font>"
+                attr_html = f"<b>{_xml(attraction.name)}</b><br/><font color='#64748b' size='7'>{meta_sub}</font>"
 
                 # Reason column
                 reason_text = item.reason or attraction.description or "Recommended based on destination highlights."
                 if len(reason_text) > 220:
                     reason_text = reason_text[:217] + "..."
-                reason_html = f"{reason_text}"
+                reason_html = _xml(reason_text)
 
                 # Cost & weather backup column
                 cost_val = int(attraction.estimated_cost or 0)
-                details = [f"Est. ₹{cost_val}"]
+                details = [f"Est. INR {cost_val}"]
                 if item.score:
                     details.append(f"Match: {item.score:.1f}/100")
                 details_text = "<br/>".join(details)
 
                 if item.weather_alternative:
-                    details_text += f"<br/><font color='#b45309'><b>Weather backup:</b><br/>{item.weather_alternative.name}</font>"
+                    details_text += f"<br/><font color='#b45309'><b>Weather backup:</b><br/>{_xml(item.weather_alternative.name)}</font>"
 
                 table_rows.append([
                     Paragraph(time_str, cell_bold),
@@ -265,16 +271,16 @@ def trip_pdf(trip):
         for exp in expenses:
             total_exp += exp.amount
             exp_rows.append([
-                Paragraph(exp.category.title(), cell_style),
-                Paragraph(exp.description or "—", cell_style),
-                Paragraph(f"₹{exp.amount:,}", cell_bold),
+                Paragraph(_xml(exp.category).title(), cell_style),
+                Paragraph(_xml(exp.description) or "—", cell_style),
+                Paragraph(f"INR {exp.amount:,}", cell_bold),
             ])
         exp_rows.append([
             Paragraph("<b>Total Recorded</b>", cell_bold),
             Paragraph("", cell_style),
-            Paragraph(f"<b>₹{total_exp:,}</b>", cell_bold),
+            Paragraph(f"<b>INR {total_exp:,}</b>", cell_bold),
         ])
-        exp_table = Table(exp_rows, colWidths=[130, 263, 130])
+        exp_table = Table(exp_rows, colWidths=[130, 263, 130], repeatRows=1)
         exp_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#334155")),
             ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#e2e8f0")),
@@ -287,13 +293,18 @@ def trip_pdf(trip):
         story.append(KeepTogether(exp_block))
 
     # 5. Footer Notice
-    story.append(Spacer(1, 12))
     footer_text = (
         "Generated by SmartTrip AI. Feasibility scores, road routes and weather-adaptive alternatives "
         "are estimates designed to assist your journey planning. Verify opening hours and tickets locally."
     )
-    story.append(Paragraph(footer_text, cell_muted))
 
-    doc.build(story)
+    def draw_footer(canvas, document):
+        canvas.saveState()
+        footer = Paragraph(footer_text, cell_muted)
+        footer.wrap(document.width, document.bottomMargin)
+        footer.drawOn(canvas, document.leftMargin, 10)
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
     buffer.seek(0)
     return buffer

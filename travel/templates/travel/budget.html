@@ -50,7 +50,7 @@
                     <p class="text-muted mb-2"><i class="fa-solid fa-calculator text-info me-1"></i>Estimated Cost</p>
                     <h3 class="fw-bold">₹{{ estimated_trip_cost }}</h3>
                     <small class="text-muted">
-                        {{ trip.days }} days · {{ trip.travelers }} traveler(s)
+                        Planning estimate from the destination's seeded daily-cost value · {{ trip.days }} days · {{ trip.travelers }} traveler(s)
                     </small>
                 </div>
             </div>
@@ -86,6 +86,26 @@
                     <small class="text-muted">Target: ₹{{ target_daily_budget }}/day</small>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-body p-4">
+            <h4 class="fw-bold mb-2">Plan your category allocations</h4>
+            <p class="text-muted">Choose how to divide your total budget. Targets are planning estimates; expenses below are amounts you enter.</p>
+            <form method="post" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_allocations">
+                {% for field in allocation_form %}
+                <div class="col-6 col-md-4 col-xl">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }} (%)</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                {% for error in allocation_form.non_field_errors %}<div class="col-12 text-danger">{{ error }}</div>{% endfor %}
+                <div class="col-12 col-xl-auto"><button type="submit" class="btn btn-outline-primary">Save allocations</button></div>
+            </form>
         </div>
     </div>
 
@@ -127,7 +147,7 @@
                         <i class="fa-solid fa-chart-simple me-1"></i>Budget Intelligence
                     </span>
                     <h4 class="fw-bold mb-0">Planned vs. Actual Spending Analysis</h4>
-                    <small class="text-muted">Benchmark allocations based on standard travel cost distribution.</small>
+                    <small class="text-muted">Your chosen shares compared with manually recorded expenses.</small>
                 </div>
             </div>
 
@@ -196,8 +216,22 @@
                     <h4 class="mb-3">Spending by Category</h4>
 
                     {% if category_labels %}
-                    <div style="position: relative; height: 300px;">
+                    <div id="expenseCategoryChartContainer" style="position: relative; height: 300px;" hidden>
                         <canvas id="expenseCategoryChart"></canvas>
+                    </div>
+                    <div id="expenseCategoryChartFallback" class="text-muted" role="status">
+                        <p class="mb-2">Chart visualization is unavailable. Recorded category totals:</p>
+                        <ul id="expenseCategoryChartFallbackList" class="list-unstyled mb-0">
+                            {% for row in category_chart_rows %}
+                            <li class="border-bottom py-2">
+                                <div class="d-flex justify-content-between gap-3">
+                                    <span>{{ row.label }}</span>
+                                    <strong>₹{{ row.amount|floatformat:2 }}</strong>
+                                </div>
+                                <div class="bg-primary rounded-pill mt-1" style="height: 6px; width: {{ row.share_pct }}%;"></div>
+                            </li>
+                            {% endfor %}
+                        </ul>
                     </div>
                     {% else %}
                     <p class="text-muted">
@@ -233,7 +267,7 @@
             <h4 class="mb-2">Budget Optimization</h4>
             <p class="text-muted">
                 Explore ways to reduce your estimated trip cost.
-                Suggested savings are illustrative estimates, not guaranteed discounts.
+                Suggestions are planning ideas only. SmartTrip does not look up or guarantee live prices or savings.
             </p>
 
             {% if budget_suggestions %}
@@ -252,9 +286,7 @@
                                 {{ suggestion.description }}
                             </p>
                         </div>
-                        <span class="text-success fw-semibold">
-                            <i class="fa-solid fa-arrow-trend-down me-1"></i>Potential saving: ₹{{ suggestion.saving }}
-                        </span>
+                        <span class="text-success fw-semibold"><i class="fa-solid fa-arrow-trend-down me-1"></i>Cost-saving idea</span>
                     </div>
                 </div>
                 {% endfor %}
@@ -264,13 +296,13 @@
 
             <div class="row g-3">
                 <div class="col-md-4">
-                    <p class="text-muted mb-1">Illustrative Savings</p>
-                    <h4 class="text-success">₹{{ suggested_savings }}</h4>
+                    <p class="text-muted mb-1">Savings</p>
+                    <h4 class="text-success">Not priced</h4>
                 </div>
 
                 <div class="col-md-4">
-                    <p class="text-muted mb-1">Optimized Estimate</p>
-                    <h4>₹{{ optimized_estimate }}</h4>
+                    <p class="text-muted mb-1">Estimated Cost</p>
+                    <h4>₹{{ estimated_trip_cost }}</h4>
                 </div>
 
                 <div class="col-md-4">
@@ -376,42 +408,60 @@
 
 <!-- Category Chart -->
 {% if category_labels %}
+{{ category_labels|json_script:"expense-category-labels" }}
+{{ category_amounts|json_script:"expense-category-amounts" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const categoryLabels = {{ category_labels|safe }};
-    const categoryAmounts = {{ category_amounts|safe }};
+    const categoryLabels = JSON.parse(document.getElementById("expense-category-labels").textContent);
+    const categoryAmounts = JSON.parse(document.getElementById("expense-category-amounts").textContent);
 
     const chartCanvas = document.getElementById("expenseCategoryChart");
+    const chartFallback = document.getElementById("expenseCategoryChartFallback");
+
+    function showCategoryFallback() {
+        if (!chartCanvas || !chartFallback) return;
+        chartFallback.hidden = false;
+        chartCanvas.parentElement.hidden = true;
+    }
 
     if (chartCanvas && typeof Chart !== "undefined") {
-        new Chart(chartCanvas, {
-            type: "doughnut",
-            data: {
-                labels: categoryLabels,
-                datasets: [{
-                    label: "Expenses (₹)",
-                    data: categoryAmounts,
-                    hoverOffset: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: "bottom"
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.label + ": ₹" +
-                                    Number(context.raw).toLocaleString("en-IN");
+        chartCanvas.parentElement.hidden = false;
+        try {
+            new Chart(chartCanvas, {
+                type: "doughnut",
+                data: {
+                    labels: categoryLabels,
+                    datasets: [{
+                        label: "Expenses (₹)",
+                        data: categoryAmounts,
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: "bottom"
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ": ₹" +
+                                        Number(context.raw).toLocaleString("en-IN");
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            });
+            chartCanvas.parentElement.hidden = false;
+            chartFallback.hidden = true;
+        } catch (error) {
+            showCategoryFallback();
+        }
+    } else {
+        showCategoryFallback();
     }
 </script>
 {% endif %}

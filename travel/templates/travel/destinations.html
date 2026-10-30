@@ -1,6 +1,7 @@
 
 {% extends "travel/base.html" %}
 {% load static %}
+{% load destination_images %}
 
 {% block title %}Explore destinations | SmartTrip AI{% endblock %}
 
@@ -100,26 +101,14 @@
                     <div class="travel-card h-100">
 
                         <!-- Destination image -->
-                        {% with destination_name=d.name|lower %}
-                            {% if "mysuru" in destination_name or "mysore" in destination_name %}
-                                <img
-                                    src="{% static 'travel/images/mysuru-palace.jpg' %}"
-                                    alt="Mysore Palace in Mysuru, Karnataka"
-                                    loading="eager"
-                                    decoding="async"
-                                    style="display:block; width:100%; height:210px; object-fit:cover;"
-                                >
-                            {% else %}
-                                <img
-                                    src="{{ d.image_url|default:'' }}"
-                                    alt="{{ d.name }}"
-                                    loading="lazy"
-                                    decoding="async"
-                                    style="display:block; width:100%; height:210px; object-fit:cover;"
-                                    onerror="this.onerror=null; this.src='https://placehold.co/800x500/eaf2f5/24445c?text=Explore+destination';"
-                                >
-                            {% endif %}
-                        {% endwith %}
+                        <img
+                            src="{{ d|destination_image }}"
+                            alt="{{ d.name }}"
+                            loading="lazy"
+                            decoding="async"
+                            style="display:block; width:100%; height:210px; object-fit:cover;"
+                            onerror="this.onerror=null; this.src='{{ d|destination_image_fallback }}';"
+                        >
 
                         <!-- Destination information -->
                         <div class="card-body">

@@ -2,10 +2,10 @@
 {% block title %}My Trips & Workspace | SmartTrip AI{% endblock %}
 
 {% block content %}
-<section class="section pt-5 pb-5">
+<section class="section pt-5 pb-5 dashboard-page">
   <div class="container-xl">
     <!-- Header -->
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="dashboard-heading d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
       <div>
         <span class="badge text-bg-primary rounded-pill px-3 py-2 mb-2">
           <i class="fa-regular fa-compass me-1"></i>Traveler Workspace
@@ -27,7 +27,7 @@
     </div>
 
     <!-- Quick Stats -->
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4 dashboard-kpis" aria-label="Your trip overview">
       <div class="col-6 col-md-3">
         <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
           <small class="text-muted d-block"><i class="fa-solid fa-route text-primary me-1"></i>Trips Created</small>

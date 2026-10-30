@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title">
+  <title id="title">Hampi temple ruins and boulder landscape</title>
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#b7d9df"/><stop offset="1" stop-color="#f5d99e"/></linearGradient></defs>
+  <rect width="960" height="480" fill="url(#sky)"/><circle cx="760" cy="92" r="46" fill="#f5c66c"/>
+  <path d="M0 327 85 228l109 68 113-154 96 105 115-132 113 157 100-109 150 125v192H0Z" fill="#bd8760"/>
+  <path d="M0 388 123 302l129 55 108-97 111 88 124-100 125 99 103-60 137 82v111H0Z" fill="#995e43"/>
+  <g fill="#e7c397" stroke="#87553f" stroke-width="7"><path d="M385 376h184v-18h-20v-72h-18v-28h-20v28h-20v72h-28v-55h-22v55h-28v-71h-20v71h-28Z"/><path d="M442 254h72l-36-42Z"/><path d="M441 238h74v9h-74Zm10-11h54v9h-54Z"/></g>
+  <path d="M0 430q150-48 300 0t330 0 330 0v50H0Z" fill="#d6a876"/>
+</svg>

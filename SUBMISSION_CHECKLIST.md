@@ -18,12 +18,12 @@
 
 ## Validation performed during this upgrade
 
-- Django system check: passed with SQLite test configuration.
-- Migration consistency check: passed, no model changes detected.
-- 27 Django tests: passed. These cover algorithms, route paths, geographic clustering, group preference aggregation, OTP hash/email/single-use behavior, key page rendering, trip creation, itinerary repair and weather fallback.
-- Python source compilation: passed.
-- PDF rendering test: not verified in the inspection container because the uploaded Windows virtual environment contains compiled Pillow/ReportLab extensions that cannot load on Linux. Reinstall dependencies in a native Windows virtual environment and run the full suite.
-- Real SMTP delivery and connection to the user's MySQL database: not verified because private credentials and the user's local MySQL service were not available.
+- 30 October 2026: Django system check passed; `makemigrations --check --dry-run` found no missing migrations.
+- 30 October 2026: Full `travel` suite passed, 161 tests in 521.368 seconds, using a temporary in-memory SQLite test database. Focused assistant and Copilot tests passed, 35 tests in 104.813 seconds.
+- JavaScript syntax check passed for `travel/static/travel/js/app.js`.
+- PDF generation/content tests passed as part of the Django suite. A visual PDF rendering inspection was not performed.
+- Real SMTP delivery and MySQL connectivity were not re-tested during this isolated test run. Earlier user-reported read-only checks are separate from these results.
+- Live weather, routing, external map tiles, configured Ollama/OpenAI services, and a browser-based walkthrough were not verified in this run.
 
 See `docs/TEST_RESULTS.md` and `docs/IMPLEMENTATION_STATUS.md` for the complete limitations.
 
